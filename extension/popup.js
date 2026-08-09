@@ -296,7 +296,7 @@ async function startSync(project) {
 
     // 3. 批量上传文件（带重试）
     showProgress('上传文件中...', 0, resources.length);
-    const { failed, failedPaths } = await uploadResourcesInBatches({
+    const { failed, failedPaths, skipped, skippedPaths } = await uploadResourcesInBatches({
       resources,
       baseUrl,
       server,
@@ -308,7 +308,11 @@ async function startSync(project) {
 
     if (failed > 0) {
       const sample = failedPaths.slice(0, 5).join('；');
-      throw new Error(`有 ${failed} 个资源未上传，已停止发布。请重新同步。失败示例：${sample}`);
+      throw new Error(`有 ${failed} 个资源上传失败，已停止发布。失败示例：${sample}`);
+    }
+
+    if (skipped > 0) {
+      console.warn(`[MockLink] ${skipped} 个资源在原型中不存在（404），已跳过：`, skippedPaths);
     }
 
     // 4. 发布
@@ -340,16 +344,15 @@ async function startSync(project) {
     statusText.textContent = updateToken ? '项目更新完成！' : '新项目同步完成！';
 
     // 自动复制
+    let hintMsg = '链接已自动复制到剪贴板';
+    if (skipped > 0) {
+      hintMsg += `（${skipped} 个不存在的资源已跳过）`;
+    }
     try {
       await navigator.clipboard.writeText(shareUrl);
-      hintEl.textContent = '链接已自动复制到剪贴板' + (failed > 0 ? `（${failed} 个文件上传失败）` : '');
+      hintEl.textContent = hintMsg;
     } catch (e) {
-      hintEl.textContent = failed > 0 ? `${failed} 个文件上传失败` : '';
-    }
-    if (failed > 0 && failedPaths.length > 0) {
-      const sample = failedPaths.slice(0, 3).join('；');
-      hintEl.textContent = `同步完成，但有 ${failed} 个资源未上传：${sample}`;
-      console.warn('上传失败的文件:', failedPaths);
+      hintEl.textContent = skipped > 0 ? `${skipped} 个不存在的资源已跳过` : '';
     }
 
     await loadProjects(token);
@@ -375,7 +378,12 @@ async function fetchResourceAsUploadFile(item, baseUrl) {
   const sourceUrl = typeof item === 'string' ? new URL(item, baseUrl).href : item.url;
   const fileUrl = sourceUrl || new URL(path, baseUrl).href;
   const fileRes = await fetch(fileUrl);
-  if (!fileRes.ok) throw new Error(`读取失败 HTTP ${fileRes.status}`);
+  if (!fileRes.ok) {
+    const err = new Error(`HTTP ${fileRes.status}`);
+    err.statusCode = fileRes.status;
+    err.isNotFound = fileRes.status === 404;
+    throw err;
+  }
   const buffer = await fileRes.arrayBuffer();
   return {
     path,
@@ -415,7 +423,9 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
   const maxBatchFiles = 40;
   let done = 0;
   let failed = 0;
+  let skipped = 0;
   const failedPaths = [];
+  const skippedPaths = [];
   const batches = [];
   let current = [];
   let currentBytes = 0;
@@ -440,8 +450,13 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
         currentBytes += file.size;
       }
     } catch (e) {
-      failed++;
-      failedPaths.push(`${path}（${e.message || '读取失败'}）`);
+      if (e.isNotFound) {
+        skipped++;
+        skippedPaths.push(path);
+      } else {
+        failed++;
+        failedPaths.push(`${path}（${e.message || '读取失败'}）`);
+      }
     }
   }, 6);
   flushBatch();
@@ -467,7 +482,7 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
     onProgress(done, resources.length, failed);
   }, 4);
 
-  return { failed, failedPaths };
+  return { failed, failedPaths, skipped, skippedPaths };
 }
 
 // ===== 并发控制 =====

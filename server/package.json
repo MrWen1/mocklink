@@ -1,0 +1,11 @@
+{
+  "name": "axure-hosting-server",
+  "version": "1.0.0",
+  "description": "Axure 原型托管服务 - 第一阶段 MVP（零依赖）",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {}
+}

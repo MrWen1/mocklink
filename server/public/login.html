@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 - MockLink</title>
+<style>
+  :root {
+    --bg: #f5f6f7;
+    --surface: #ffffff;
+    --ink: #2a2d31;
+    --muted: #b8bdc3;
+    --soft: #eef1f5;
+    --rule: #d9dde2;
+    --accent: #439565;
+    --accent-hover: #378357;
+    --danger: #d84c44;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "SF Pro Text", system-ui, sans-serif;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(203, 209, 216, 0.28), transparent 34%),
+      linear-gradient(180deg, rgba(255,255,255,0.75), rgba(239,241,244,0.72));
+  }
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 360px;
+    min-height: 400px;
+    padding: 24px;
+    background: var(--surface);
+    border-radius: 0;
+    box-shadow: 0 26px 74px rgba(44, 53, 62, 0.09);
+  }
+  .card.registering,
+  .card.resetting {
+    min-height: 610px;
+    padding-top: 46px;
+  }
+  .brand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 34px;
+  }
+  .brand img { display: none; }
+  .brand h1 {
+    margin: 0;
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: -1px;
+    font-weight: 800;
+    color: #282a2e;
+  }
+  .brand h1::after {
+    content: "Beta";
+    display: inline-block;
+    margin-left: 9px;
+    color: #c8c8c8;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    vertical-align: middle;
+  }
+  .brand p { display: none; }
+  form {
+    width: 100%;
+    max-width: 312px;
+    margin: 0 auto;
+  }
+  .field {
+    position: relative;
+    margin-bottom: 25px;
+  }
+  .field.compact { margin-bottom: 12px; }
+  .field label { display: none; }
+  .field svg {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    color: #1f2429;
+    pointer-events: none;
+  }
+  .field input {
+    width: 100%;
+    height: 40px;
+    padding: 0 34px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    outline: none;
+    font-size: 16px;
+    color: var(--ink);
+    background: #fff;
+    transition: border-color .18s ease, box-shadow .18s ease;
+  }
+  .field input::placeholder {
+    color: #b9bfc6;
+  }
+  .field input:focus {
+    border-color: #c6ccd3;
+    box-shadow: inset 0 0 0 999px rgba(229, 236, 250, 0.74);
+  }
+  .clear {
+    position: absolute;
+    right: 11px;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+    border: 1px solid #c7ccd1;
+    border-radius: 50%;
+    color: #aeb4ba;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 16px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .field.has-value .clear { display: flex; }
+  .code-field {
+    display: none;
+  }
+  .card.registering .code-field,
+  .card.resetting .code-field {
+    display: block;
+  }
+  .code-field input {
+    padding-right: 102px;
+  }
+  .send-code {
+    position: absolute;
+    right: 1px;
+    top: 1px;
+    width: 90px;
+    height: 38px;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbfb 100%);
+    color: #202327;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0;
+    cursor: pointer;
+    transition: background .16s ease, color .16s ease;
+  }
+  .send-code:hover:not(:disabled) {
+    background: #f8faf9;
+    color: var(--accent);
+  }
+  .send-code:active:not(:disabled) {
+    background: #f1f5f2;
+  }
+  .send-code:disabled {
+    color: #b8bdc3;
+    background: #fafafa;
+    cursor: not-allowed;
+  }
+  .forgot {
+    min-height: 20px;
+    margin: -8px 0 12px;
+    text-align: right;
+  }
+  .forgot a {
+    color: #c6c8cc;
+    font-size: 12px;
+    text-decoration: none;
+  }
+  .btn {
+    width: 100%;
+    height: 40px;
+    border: none;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    cursor: pointer;
+    margin-top: 0;
+    transition: background .18s ease, transform .18s ease;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .switch {
+    margin-top: 9px;
+    font-size: 14px;
+    color: #1f2328;
+  }
+  .switch button {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .agreement {
+    margin-top: 14px;
+    color: #c3c7cc;
+    font-size: 12px;
+  }
+  .agreement span { color: #b7bbc0; }
+  .error {
+    display: none;
+    margin: 8px 0 0;
+    color: var(--danger);
+    font-size: 12px;
+  }
+  .error.show { display: block; }
+  .error.info { color: var(--accent); }
+  @media (max-width: 420px) {
+    body { align-items: stretch; }
+    .card {
+      width: 100%;
+      min-height: 100vh;
+      padding: 72px 24px 28px;
+    }
+    .brand h1 { font-size: 34px; }
+    form { max-width: 320px; }
+    .field input { height: 42px; font-size: 15px; }
+    .btn { height: 44px; font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">
+      <img src="/logo.png" alt="MockLink" onerror="this.style.display='none'">
+      <div>
+        <h1>MockLink</h1>
+        <p>Axure 原型托管管理后台</p>
+      </div>
+    </div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label>账号</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 21a8 8 0 0 0-16 0"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <input id="email" autocomplete="username" placeholder="请输入账号 / 邮箱">
+        <button class="clear" type="button" aria-label="清空账号">×</button>
+      </div>
+      <div class="field code-field" id="codeField" hidden>
+        <label>邮箱验证码</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 12 2 2 4-5"></path>
+        </svg>
+        <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入验证码">
+        <button class="send-code" id="sendCodeBtn" type="button">发送</button>
+      </div>
+      <div class="field" id="nameField" hidden>
+        <label>昵称</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 21a8 8 0 0 0-16 0"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        <input id="name" autocomplete="name" placeholder="请输入昵称">
+        <button class="clear" type="button" aria-label="清空昵称">×</button>
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+          <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+        </svg>
+        <input id="password" type="password" autocomplete="current-password" placeholder="请输入密码">
+        <button class="clear" type="button" aria-label="清空密码">×</button>
+      </div>
+      <div class="field" id="confirmPasswordField" hidden>
+        <label>确认密码</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+          <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+        </svg>
+        <input id="confirmPassword" type="password" autocomplete="new-password" placeholder="请再次输入密码">
+        <button class="clear" type="button" aria-label="清空确认密码">×</button>
+      </div>
+      <div class="forgot" id="forgotRow"><a href="javascript:void(0)">忘记密码</a></div>
+      <button class="btn" id="loginBtn" type="submit">登 录</button>
+      <div class="switch" id="switchText">没有账号？ <button id="switchMode" type="button">马上注册</button></div>
+      <div class="agreement">登录或注册即表示同意 <span>《MockLink 服务协议》</span></div>
+      <div class="error" id="error"></div>
+    </form>
+  </main>
+
+<script>
+let mode = 'login';
+let codeCountdown = 0;
+let codeTimer = null;
+
+async function checkLogin() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.user) {
+      location.replace('/');
+      return;
+    }
+    localStorage.removeItem('wc_auth_token');
+  } catch (e) {
+    localStorage.removeItem('wc_auth_token');
+  }
+}
+checkLogin();
+
+function setMode(nextMode) {
+  mode = nextMode;
+  const isRegister = mode === 'register';
+  const isReset = mode === 'reset';
+  const card = document.querySelector('.card');
+  document.title = `${isRegister ? '注册' : isReset ? '找回密码' : '登录'} - MockLink`;
+  card.classList.toggle('registering', isRegister);
+  card.classList.toggle('resetting', isReset);
+  document.getElementById('codeField').hidden = !(isRegister || isReset);
+  document.getElementById('nameField').hidden = !isRegister;
+  document.getElementById('confirmPasswordField').hidden = !(isRegister || isReset);
+  document.getElementById('forgotRow').style.display = (isRegister || isReset) ? 'none' : 'block';
+  document.getElementById('email').placeholder = isRegister ? '请输入注册邮箱' : isReset ? '请输入绑定邮箱' : '请输入账号 / 邮箱';
+  document.getElementById('password').autocomplete = (isRegister || isReset) ? 'new-password' : 'current-password';
+  document.getElementById('password').placeholder = isReset ? '请输入新密码' : '请输入密码';
+  document.getElementById('confirmPassword').placeholder = isReset ? '请再次输入新密码' : '请再次输入密码';
+  document.getElementById('loginBtn').textContent = isRegister ? '注 册' : isReset ? '重置密码' : '登 录';
+  document.getElementById('switchText').innerHTML = isRegister
+    ? '已有账号？ <button id="switchMode" type="button">马上登录</button>'
+    : isReset
+      ? '想起密码？ <button id="switchMode" type="button">返回登录</button>'
+      : '没有账号？ <button id="switchMode" type="button">马上注册</button>';
+  document.getElementById('switchMode').addEventListener('click', () => setMode((isRegister || isReset) ? 'login' : 'register'));
+  const err = document.getElementById('error');
+  err.classList.remove('show');
+  err.classList.remove('info');
+  updateFieldStates();
+}
+
+function showError(message) {
+  const err = document.getElementById('error');
+  err.classList.remove('info');
+  err.textContent = message;
+  err.classList.add('show');
+}
+
+function showInfo(message) {
+  const err = document.getElementById('error');
+  err.classList.add('info');
+  err.textContent = message;
+  err.classList.add('show');
+}
+
+function normalizeEmailInput(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/＠/g, '@');
+}
+
+function isValidEmail(value) {
+  const email = normalizeEmailInput(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function setCodeButtonState() {
+  const btn = document.getElementById('sendCodeBtn');
+  if (codeCountdown > 0) {
+    btn.disabled = true;
+    btn.textContent = `${codeCountdown}s`;
+  } else {
+    btn.disabled = false;
+    btn.textContent = '发送';
+  }
+}
+
+function startCodeCountdown() {
+  codeCountdown = 60;
+  setCodeButtonState();
+  if (codeTimer) clearInterval(codeTimer);
+  codeTimer = setInterval(() => {
+    codeCountdown -= 1;
+    if (codeCountdown <= 0) {
+      clearInterval(codeTimer);
+      codeTimer = null;
+      codeCountdown = 0;
+    }
+    setCodeButtonState();
+  }, 1000);
+}
+
+function updateFieldStates() {
+  document.querySelectorAll('.field input').forEach(input => {
+    input.closest('.field').classList.toggle('has-value', !!input.value);
+  });
+}
+
+document.querySelectorAll('.field input').forEach(input => {
+  input.addEventListener('input', updateFieldStates);
+});
+
+document.querySelectorAll('.clear').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = btn.parentElement.querySelector('input');
+    input.value = '';
+    input.focus();
+    updateFieldStates();
+  });
+});
+
+document.getElementById('switchMode').addEventListener('click', () => setMode('register'));
+document.querySelector('#forgotRow a').addEventListener('click', () => setMode('reset'));
+
+document.getElementById('sendCodeBtn').addEventListener('click', async () => {
+  const emailInput = document.getElementById('email');
+  const email = normalizeEmailInput(emailInput.value);
+  emailInput.value = email;
+  updateFieldStates();
+  const err = document.getElementById('error');
+  err.classList.remove('show');
+  err.classList.remove('info');
+  if (!isValidEmail(email)) {
+    showError('请输入有效邮箱后再发送验证码');
+    return;
+  }
+  const btn = document.getElementById('sendCodeBtn');
+  btn.disabled = true;
+  btn.textContent = '发送中';
+  try {
+    const res = await fetch(mode === 'reset' ? '/api/auth/send-reset-code' : '/api/auth/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '验证码发送失败');
+    if (data.devCode) {
+      document.getElementById('verificationCode').value = data.devCode;
+      updateFieldStates();
+      showInfo(`测试环境验证码：${data.devCode}`);
+    } else {
+      showInfo(data.message || 'MockLink验证码已发送，请查收邮箱');
+    }
+    startCodeCountdown();
+  } catch (e) {
+    showError(e.message);
+    btn.disabled = false;
+    btn.textContent = '发送';
+  }
+});
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('error');
+  const emailInput = document.getElementById('email');
+  const email = normalizeEmailInput(emailInput.value);
+  emailInput.value = email;
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+  const verificationCode = document.getElementById('verificationCode').value.trim();
+  const name = document.getElementById('name').value.trim();
+
+  err.classList.remove('show');
+  err.classList.remove('info');
+  if ((mode === 'register' || mode === 'reset') && !isValidEmail(email)) {
+    showError(mode === 'reset' ? '请输入绑定邮箱' : '注册账号请输入有效邮箱');
+    return;
+  }
+  if ((mode === 'register' || mode === 'reset') && !verificationCode) {
+    showError('请输入邮箱验证码');
+    return;
+  }
+  if ((mode === 'register' || mode === 'reset') && password.length < 6) {
+    showError('密码至少 6 位');
+    return;
+  }
+  if ((mode === 'register' || mode === 'reset') && password !== confirmPassword) {
+    showError('两次输入的密码不一致');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = mode === 'register' ? '注册中...' : mode === 'reset' ? '重置中...' : '登录中...';
+  try {
+    const endpoint = mode === 'register' ? 'register' : mode === 'reset' ? 'reset-password' : 'login';
+    const res = await fetch(`/api/auth/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        confirmPassword,
+        verificationCode,
+        name,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || (mode === 'register' ? '注册失败' : mode === 'reset' ? '重置密码失败' : '登录失败'));
+    if (mode === 'reset') {
+      showInfo(data.message || '密码已重置，请使用新密码登录');
+      document.getElementById('password').value = '';
+      document.getElementById('confirmPassword').value = '';
+      document.getElementById('verificationCode').value = '';
+      setTimeout(() => setMode('login'), 900);
+      return;
+    }
+    localStorage.setItem('wc_auth_token', data.token);
+    location.href = '/';
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = mode === 'register' ? '注 册' : mode === 'reset' ? '重置密码' : '登 录';
+  }
+});
+</script>
+</body>
+</html>

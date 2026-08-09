@@ -1,0 +1,3 @@
+/* Axure default CSS */
+#topPanel { height: 36px; background: #fff; border-bottom: 1px solid #ddd; }
+#mainPanel { position: absolute; top: 36px; left: 0; right: 0; bottom: 0; }

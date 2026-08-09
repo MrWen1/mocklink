@@ -1,0 +1,14 @@
+node_modules/
+.netlify/
+.env
+.env.*
+
+server/storage/
+server/public/extension.zip
+mocklink-static-netlify-deploy.zip
+
+.DS_Store
+__MACOSX/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

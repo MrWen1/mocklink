@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <img class="logo" src="icons/icon48.png" alt="MockLink">
+    <div>
+      <div class="title">MockLink</div>
+      <div class="desc">Axure 原型一键同步</div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>同步到平台地址</label>
+    <input id="server" placeholder="http://localhost:3000">
+  </div>
+
+  <div class="field project-field">
+    <label>项目</label>
+    <div class="project-select">
+      <input id="projectInput" placeholder="请选择或搜索需要更新的项目">
+      <button id="projectClearBtn" class="project-clear" title="清空选择">×</button>
+      <div id="projectDropdown" class="project-dropdown"></div>
+    </div>
+    <div id="projectHint" class="project-hint">可选择已有项目进行更新，或新建项目上传。</div>
+  </div>
+
+  <!-- 检测状态 -->
+  <div class="detect-status" id="detectStatus">
+    <div class="detect-icon spinner-icon"></div>
+    <span>正在检测当前页面...</span>
+  </div>
+
+  <!-- 同步按钮 -->
+  <button class="sync-btn" id="syncBtn" disabled>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <span id="syncLabel">新建项目并同步</span>
+  </button>
+
+  <!-- 进度 -->
+  <div class="progress" id="progress">
+    <div class="stat">
+      <span id="statusText">准备同步…</span>
+      <span><b id="doneCount">0</b>/<span id="totalCount">0</span></span>
+    </div>
+    <div class="bar-bg"><div class="bar" id="bar"></div></div>
+  </div>
+
+  <!-- 结果 -->
+  <div class="result" id="result">
+    <div class="label">分享链接</div>
+    <input id="shareInput" readonly>
+    <div class="actions">
+      <button class="copy" id="copyBtn">复制链接</button>
+      <button class="open" id="openBtn">打开查看</button>
+    </div>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div class="hint" id="hint"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

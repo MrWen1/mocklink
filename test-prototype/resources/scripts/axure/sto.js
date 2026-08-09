@@ -1,0 +1,1 @@
+// Axure stub: sto

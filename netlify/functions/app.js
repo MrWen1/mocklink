@@ -44,7 +44,7 @@ const MIME = {
   '.xml': 'text/xml; charset=utf-8',
 };
 
-const store = getStore(STORE_NAME);
+const store = getStore(STORE_NAME, { consistency: 'strong' });
 
 function getMime(filePath) {
   return MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
@@ -167,7 +167,7 @@ function optionsResponse() {
 
 async function readJSON(key, fallback) {
   try {
-    const value = await store.get(key, { type: 'json' });
+    const value = await store.get(key, { type: 'json', consistency: 'strong' });
     return value ?? fallback;
   } catch (e) {
     return fallback;

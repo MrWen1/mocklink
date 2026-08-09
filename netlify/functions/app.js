@@ -511,7 +511,7 @@ function resolveRelativeAsset(fromPath, ref) {
   const value = String(ref).trim().split('#')[0].split('?')[0];
   if (!value || value.startsWith('#')) return '';
   if (/^(?:https?:)?\/\//i.test(value)) return '';
-  if (/^(?:data|blob|mailto|javascript):/i.test(value)) return '';
+  if (/^(?:data|blob|mailto|javascript|about):/i.test(value)) return '';
   if (value.startsWith('/')) return sanitizePath(value);
   const dir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/') + 1) : '';
   return sanitizePath(path.posix.normalize(dir + value));

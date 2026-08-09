@@ -294,61 +294,17 @@ async function startSync(project) {
       token = (await res.json()).token;
     }
 
-    // 3. 并发上传文件（带重试）
+    // 3. 批量上传文件（带重试）
     showProgress('上传文件中...', 0, resources.length);
-    let done = 0, failed = 0;
-    const failedPaths = [];
-
-    await pMap(resources, async (item) => {
-      const relPath = typeof item === 'string' ? item : item.path;
-      const sourceUrl = typeof item === 'string' ? new URL(item, baseUrl).href : item.url;
-      let success = false;
-      let lastReason = '';
-      // 最多重试 3 次，降低临时读取/网络抖动造成的漏传概率
-      for (let attempt = 0; attempt < 3 && !success; attempt++) {
-        try {
-          // 使用 content script 已解析好的真实 URL，避免 file:// 中文、空格路径二次编码失败
-          const fileUrl = sourceUrl || new URL(relPath, baseUrl).href;
-          const fileRes = await fetch(fileUrl);
-          if (!fileRes.ok) {
-            lastReason = `HTTP ${fileRes.status}`;
-            if (attempt === 2) { failed++; failedPaths.push(`${relPath}（${lastReason}）`); }
-            continue;
-          }
-
-          const buffer = await fileRes.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          const chunks = [];
-          for (let i = 0; i < bytes.length; i += 8192) {
-            chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-          }
-          const b64 = btoa(chunks.join(''));
-
-          const uploadRes = await fetch(`${server}/api/prototypes/${token}/files`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: relPath, content: b64 })
-          });
-          if (uploadRes.ok) {
-            success = true;
-          } else if (attempt === 2) {
-            let uploadReason = '上传接口错误';
-            try {
-              const errData = await uploadRes.json();
-              uploadReason = errData.error || uploadReason;
-            } catch (e) {
-              uploadReason = `HTTP ${uploadRes.status}`;
-            }
-            failed++; failedPaths.push(`${relPath}（${uploadReason}）`);
-          }
-        } catch (e) {
-          lastReason = e.message || '读取失败';
-          if (attempt === 2) { failed++; failedPaths.push(`${relPath}（${lastReason}）`); }
-        }
-      }
-
-      done++;
-      showProgress(failed > 0 ? `上传中... (${failed} 失败)` : '上传文件中...', done, resources.length);
-    }, 3);
+    const { failed, failedPaths } = await uploadResourcesInBatches({
+      resources,
+      baseUrl,
+      server,
+      token,
+      onProgress(done, total, failedCount) {
+        showProgress(failedCount > 0 ? `上传中... (${failedCount} 失败)` : '上传文件中...', done, total);
+      },
+    });
 
     if (failed > 0) {
       const sample = failedPaths.slice(0, 5).join('；');
@@ -403,6 +359,115 @@ async function startSync(project) {
   } finally {
     resetState();
   }
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += 8192) {
+    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+  }
+  return btoa(chunks.join(''));
+}
+
+async function fetchResourceAsUploadFile(item, baseUrl) {
+  const path = typeof item === 'string' ? item : item.path;
+  const sourceUrl = typeof item === 'string' ? new URL(item, baseUrl).href : item.url;
+  const fileUrl = sourceUrl || new URL(path, baseUrl).href;
+  const fileRes = await fetch(fileUrl);
+  if (!fileRes.ok) throw new Error(`读取失败 HTTP ${fileRes.status}`);
+  const buffer = await fileRes.arrayBuffer();
+  return {
+    path,
+    content: arrayBufferToBase64(buffer),
+    size: buffer.byteLength,
+  };
+}
+
+async function postJSONWithRetry(url, body, retries = 3) {
+  let lastError = '';
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return;
+      try {
+        const data = await res.json();
+        lastError = data.error || `HTTP ${res.status}`;
+      } catch (e) {
+        lastError = `HTTP ${res.status}`;
+      }
+    } catch (e) {
+      lastError = e.message || '网络错误';
+    }
+    if (attempt < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+  throw new Error(lastError || '上传接口错误');
+}
+
+async function uploadResourcesInBatches({ resources, baseUrl, server, token, onProgress }) {
+  const maxBatchBytes = 1.5 * 1024 * 1024;
+  const maxBatchFiles = 40;
+  let done = 0;
+  let failed = 0;
+  const failedPaths = [];
+  const batches = [];
+  let current = [];
+  let currentBytes = 0;
+
+  function flushBatch() {
+    if (!current.length) return;
+    batches.push(current);
+    current = [];
+    currentBytes = 0;
+  }
+
+  await pMap(resources, async (item) => {
+    const path = typeof item === 'string' ? item : item.path;
+    try {
+      const file = await fetchResourceAsUploadFile(item, baseUrl);
+      if (file.size > maxBatchBytes) {
+        flushBatch();
+        batches.push([file]);
+      } else {
+        if (current.length >= maxBatchFiles || currentBytes + file.size > maxBatchBytes) flushBatch();
+        current.push(file);
+        currentBytes += file.size;
+      }
+    } catch (e) {
+      failed++;
+      failedPaths.push(`${path}（${e.message || '读取失败'}）`);
+    }
+  }, 6);
+  flushBatch();
+
+  await pMap(batches, async (batch) => {
+    try {
+      if (batch.length === 1 && batch[0].size > maxBatchBytes) {
+        await postJSONWithRetry(`${server}/api/prototypes/${token}/files`, {
+          path: batch[0].path,
+          content: batch[0].content,
+        });
+      } else {
+        await postJSONWithRetry(`${server}/api/prototypes/${token}/files/batch`, {
+          files: batch.map(({ path, content }) => ({ path, content })),
+        });
+      }
+      done += batch.length;
+    } catch (e) {
+      failed += batch.length;
+      batch.forEach(file => failedPaths.push(`${file.path}（${e.message || '上传失败'}）`));
+      done += batch.length;
+    }
+    onProgress(done, resources.length, failed);
+  }, 4);
+
+  return { failed, failedPaths };
 }
 
 // ===== 并发控制 =====

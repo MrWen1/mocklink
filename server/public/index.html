@@ -2347,6 +2347,102 @@ async function pMap(items, fn, concurrency = 5) {
   await Promise.all(workers);
 }
 
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += 8192) {
+    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+  }
+  return btoa(chunks.join(''));
+}
+
+async function postJSONWithRetry(url, body, retries = 3) {
+  let lastError = '';
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await authFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return;
+      lastError = await responseError(res);
+      if (res.status === 403) throw new Error(lastError);
+    } catch (e) {
+      lastError = e.message || '网络错误';
+      if (String(lastError).includes('配额')) throw e;
+    }
+    if (attempt < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+  throw new Error(lastError || '上传接口错误');
+}
+
+async function uploadFileObjectsInBatches({ fileObjs, token, onProgress }) {
+  const maxBatchBytes = 1.5 * 1024 * 1024;
+  const maxBatchFiles = 40;
+  let done = 0;
+  let failed = 0;
+  const failedPaths = [];
+  const batches = [];
+  let current = [];
+  let currentBytes = 0;
+
+  function flushBatch() {
+    if (!current.length) return;
+    batches.push(current);
+    current = [];
+    currentBytes = 0;
+  }
+
+  await pMap(fileObjs, async ({ file, path }) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const item = {
+        path,
+        content: arrayBufferToBase64(buf),
+        size: buf.byteLength,
+      };
+      if (item.size > maxBatchBytes) {
+        flushBatch();
+        batches.push([item]);
+      } else {
+        if (current.length >= maxBatchFiles || currentBytes + item.size > maxBatchBytes) flushBatch();
+        current.push(item);
+        currentBytes += item.size;
+      }
+    } catch (e) {
+      failed++;
+      failedPaths.push(`${path}（${e.message || '读取失败'}）`);
+    }
+  }, 6);
+  flushBatch();
+
+  await pMap(batches, async (batch) => {
+    try {
+      if (batch.length === 1 && batch[0].size > maxBatchBytes) {
+        await postJSONWithRetry(`${API}/api/prototypes/${token}/files`, {
+          path: batch[0].path,
+          content: batch[0].content,
+        });
+      } else {
+        await postJSONWithRetry(`${API}/api/prototypes/${token}/files/batch`, {
+          files: batch.map(({ path, content }) => ({ path, content })),
+        });
+      }
+      done += batch.length;
+    } catch (e) {
+      failed += batch.length;
+      batch.forEach(item => failedPaths.push(`${item.path}（${e.message || '上传失败'}）`));
+      done += batch.length;
+    }
+    onProgress(done, fileObjs.length, failed);
+  }, 4);
+
+  return { failed, failedPaths };
+}
+
 async function handleFiles(files) {
   const stripTop = (p) => p.split('/').slice(1).join('/') || p;
   const fileObjs = files.map(f => ({ file: f, path: stripTop(f.webkitRelativePath) })).filter(o => o.path);
@@ -2407,49 +2503,15 @@ async function handleFiles(files) {
   }
 
   progStatus.textContent = '上传文件中...';
-  let done = 0, failed = 0;
-  const failedPaths = [];
-  await pMap(fileObjs, async ({ file, path }) => {
-    try {
-      let uploaded = false;
-      let lastError = '';
-      for (let attempt = 0; attempt < 3 && !uploaded; attempt++) {
-        try {
-          const buf = await file.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-          const chunks = [];
-          for (let i = 0; i < bytes.length; i += 8192) {
-            chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-          }
-          const b64 = btoa(chunks.join(''));
-          const r = await authFetch(`${API}/api/prototypes/${token}/files`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path, content: b64 })
-          });
-          if (r.ok) {
-            uploaded = true;
-          } else {
-            lastError = await responseError(r);
-            if (r.status === 403) throw new Error(lastError);
-          }
-        } catch (e) {
-          lastError = e.message || '上传失败';
-          if (String(lastError).includes('配额')) throw e;
-        }
-      }
-      if (!uploaded) {
-        failed++;
-        failedPaths.push(`${path}（${lastError || '上传失败'}）`);
-      }
-    } catch (e) {
-      failed++;
-      failedPaths.push(`${path}（${e.message || '上传失败'}）`);
-    }
-    done++;
-    progDone.textContent = done;
-    progFill.style.width = (done / fileObjs.length * 100) + '%';
-    progStatus.textContent = failed > 0 ? `上传文件中...（${failed} 个失败）` : '上传文件中...';
-  }, 3);
+  const { failed, failedPaths } = await uploadFileObjectsInBatches({
+    fileObjs,
+    token,
+    onProgress(done, total, failedCount) {
+      progDone.textContent = done;
+      progFill.style.width = (done / total * 100) + '%';
+      progStatus.textContent = failedCount > 0 ? `上传文件中...（${failedCount} 个失败）` : '上传文件中...';
+    },
+  });
 
   if (failed > 0) {
     const sample = failedPaths.slice(0, 5).join('；');

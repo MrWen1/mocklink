@@ -1139,6 +1139,57 @@ async function handleAPI(req, res, urlParts) {
     return;
   }
 
+  const batchFileMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/files\/batch$/);
+  if (batchFileMatch && req.method === 'POST') {
+    try {
+      const token = batchFileMatch[1];
+      const dir = protoDir(token);
+      if (!existsSync(path.join(dir, 'meta.json'))) {
+        sendJSON(res, 404, { error: '原型不存在' });
+        return;
+      }
+      const body = JSON.parse((await readBody(req)).toString());
+      const uploadFiles = Array.isArray(body.files) ? body.files : [];
+      if (!uploadFiles.length) { sendJSON(res, 400, { error: '缺少文件列表' }); return; }
+      if (uploadFiles.length > 80) { sendJSON(res, 400, { error: '单批文件数量过多' }); return; }
+      const normalized = uploadFiles.map(item => ({
+        path: sanitizePath(item.path),
+        content: item.content || '',
+      })).filter(item => item.path && item.content);
+      if (!normalized.length) { sendJSON(res, 400, { error: '缺少有效文件' }); return; }
+
+      const meta = await readMeta(token);
+      const totalBytes = normalized.reduce((sum, item) => sum + Buffer.byteLength(item.content, 'base64'), 0);
+      if (meta.ownerId) {
+        const users = await readUsers();
+        const owner = users.find(u => u.id === meta.ownerId);
+        if (owner) {
+          const quotaCheck = await assertUserQuota(owner, totalBytes, 0);
+          if (!quotaCheck.ok) { sendJSON(res, 403, { error: quotaCheck.error }); return; }
+        }
+      }
+
+      for (const item of normalized) {
+        const dest = path.join(dir, item.path);
+        if (!path.resolve(dest).startsWith(dir + path.sep)) {
+          sendJSON(res, 403, { error: '非法路径' });
+          return;
+        }
+        await fs.mkdir(path.dirname(dest), { recursive: true });
+        await fs.writeFile(dest, Buffer.from(item.content, 'base64'));
+      }
+
+      const allFiles = await listPrototypeFiles(dir);
+      meta.fileCount = allFiles.length;
+      meta.updatedAt = new Date().toISOString();
+      await writeMeta(token, meta);
+      sendJSON(res, 200, { ok: true, count: normalized.length, paths: normalized.map(item => item.path) });
+    } catch (e) {
+      sendJSON(res, 500, { error: e.message });
+    }
+    return;
+  }
+
   // POST /api/prototypes/:token/update — 更新原型（清空旧文件，保留 token 和分享路径）
   const updateMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/update$/);
   if (updateMatch && req.method === 'POST') {

@@ -354,6 +354,34 @@ async function putPrototypeFile(token, relPath, buffer) {
   await writeFileIndex(token, files);
 }
 
+async function putPrototypeFilesBatch(token, items) {
+  const now = new Date().toISOString();
+  const files = await readFileIndex(token);
+  const byPath = new Map(files.map(file => [file.path, file]));
+  const normalized = items.map(item => {
+    const relPath = sanitizePath(item.path);
+    const buffer = Buffer.from(item.content || '', 'base64');
+    return { relPath, buffer };
+  }).filter(item => item.relPath && item.buffer.byteLength >= 0);
+
+  await Promise.all(normalized.map(async ({ relPath, buffer }) => {
+    const key = fileBlobKey(token, relPath);
+    await store.set(key, buffer, {
+      contentType: getMime(relPath),
+    });
+    byPath.set(relPath, {
+      path: relPath,
+      key,
+      size: buffer.byteLength,
+      contentType: getMime(relPath),
+      updatedAt: now,
+    });
+  }));
+
+  await writeFileIndex(token, [...byPath.values()]);
+  return normalized.map(item => item.relPath);
+}
+
 async function getPrototypeFile(token, relPath) {
   const files = await readFileIndex(token);
   const item = files.find(file => file.path === relPath);
@@ -1076,6 +1104,44 @@ async function handleAPI(request, pathname) {
       meta.updatedAt = new Date().toISOString();
       await writeMeta(token, meta);
       return jsonResponse({ ok: true, path: relPath });
+    } catch (e) {
+      return jsonResponse({ error: e.message }, 500);
+    }
+  }
+
+  const batchFileMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/files\/batch$/);
+  if (batchFileMatch && request.method === 'POST') {
+    try {
+      const token = batchFileMatch[1];
+      const meta = await readMeta(token);
+      if (!meta) return jsonResponse({ error: '原型不存在' }, 404);
+      const body = await parseJSONBody(request);
+      const uploadFiles = Array.isArray(body.files) ? body.files : [];
+      if (!uploadFiles.length) return jsonResponse({ error: '缺少文件列表' }, 400);
+      if (uploadFiles.length > 80) return jsonResponse({ error: '单批文件数量过多' }, 400);
+
+      const normalized = uploadFiles.map(item => ({
+        path: sanitizePath(item.path),
+        content: item.content || '',
+      })).filter(item => item.path && item.content);
+      if (!normalized.length) return jsonResponse({ error: '缺少有效文件' }, 400);
+
+      const totalBytes = normalized.reduce((sum, item) => sum + Buffer.byteLength(item.content, 'base64'), 0);
+      if (meta.ownerId) {
+        const users = await readUsers();
+        const owner = users.find(u => u.id === meta.ownerId);
+        if (owner) {
+          const quotaCheck = await assertUserQuota(owner, totalBytes, 0);
+          if (!quotaCheck.ok) return jsonResponse({ error: quotaCheck.error }, 403);
+        }
+      }
+
+      const paths = await putPrototypeFilesBatch(token, normalized);
+      const files = await readFileIndex(token);
+      meta.fileCount = files.length;
+      meta.updatedAt = new Date().toISOString();
+      await writeMeta(token, meta);
+      return jsonResponse({ ok: true, count: paths.length, paths });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
     }

@@ -304,15 +304,15 @@ async function startSync(project) {
       const sourceUrl = typeof item === 'string' ? new URL(item, baseUrl).href : item.url;
       let success = false;
       let lastReason = '';
-      // 最多重试 2 次
-      for (let attempt = 0; attempt < 2 && !success; attempt++) {
+      // 最多重试 3 次，降低临时读取/网络抖动造成的漏传概率
+      for (let attempt = 0; attempt < 3 && !success; attempt++) {
         try {
           // 使用 content script 已解析好的真实 URL，避免 file:// 中文、空格路径二次编码失败
           const fileUrl = sourceUrl || new URL(relPath, baseUrl).href;
           const fileRes = await fetch(fileUrl);
           if (!fileRes.ok) {
             lastReason = `HTTP ${fileRes.status}`;
-            if (attempt === 1) { failed++; failedPaths.push(`${relPath}（${lastReason}）`); }
+            if (attempt === 2) { failed++; failedPaths.push(`${relPath}（${lastReason}）`); }
             continue;
           }
 
@@ -330,7 +330,7 @@ async function startSync(project) {
           });
           if (uploadRes.ok) {
             success = true;
-          } else if (attempt === 1) {
+          } else if (attempt === 2) {
             let uploadReason = '上传接口错误';
             try {
               const errData = await uploadRes.json();
@@ -342,13 +342,18 @@ async function startSync(project) {
           }
         } catch (e) {
           lastReason = e.message || '读取失败';
-          if (attempt === 1) { failed++; failedPaths.push(`${relPath}（${lastReason}）`); }
+          if (attempt === 2) { failed++; failedPaths.push(`${relPath}（${lastReason}）`); }
         }
       }
 
       done++;
       showProgress(failed > 0 ? `上传中... (${failed} 失败)` : '上传文件中...', done, resources.length);
-    }, 8);
+    }, 3);
+
+    if (failed > 0) {
+      const sample = failedPaths.slice(0, 5).join('；');
+      throw new Error(`有 ${failed} 个资源未上传，已停止发布。请重新同步。失败示例：${sample}`);
+    }
 
     // 4. 发布
     showProgress('发布中...', resources.length, resources.length);

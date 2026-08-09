@@ -506,6 +506,47 @@ function findEntryPath(files, requestedEntry = '') {
   return paths.filter(item => /\.html?$/i.test(item)).sort()[0] || '';
 }
 
+function resolveRelativeAsset(fromPath, ref) {
+  if (!ref) return '';
+  const value = String(ref).trim().split('#')[0].split('?')[0];
+  if (!value || value.startsWith('#')) return '';
+  if (/^(?:https?:)?\/\//i.test(value)) return '';
+  if (/^(?:data|blob|mailto|javascript):/i.test(value)) return '';
+  if (value.startsWith('/')) return sanitizePath(value);
+  const dir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/') + 1) : '';
+  return sanitizePath(path.posix.normalize(dir + value));
+}
+
+async function validatePrototypeReferences(token, files) {
+  const existing = new Set(files.map(file => file.path));
+  const missing = new Set();
+  const textFiles = files
+    .map(file => file.path)
+    .filter(filePath => /\.(html?|css)$/i.test(filePath));
+
+  for (const filePath of textFiles) {
+    const file = await getPrototypeFile(token, filePath);
+    if (!file) continue;
+    const text = Buffer.from(file.data).toString('utf8');
+    const refs = [];
+
+    if (/\.html?$/i.test(filePath)) {
+      const attrMatches = text.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi);
+      for (const match of attrMatches) refs.push(match[1]);
+    }
+
+    const cssMatches = text.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/gi);
+    for (const match of cssMatches) refs.push(match[1]);
+
+    for (const ref of refs) {
+      const resolved = resolveRelativeAsset(filePath, ref);
+      if (resolved && !existing.has(resolved)) missing.add(resolved);
+    }
+  }
+
+  return [...missing].sort();
+}
+
 async function handleAPI(request, pathname) {
   if (request.method === 'OPTIONS') return optionsResponse();
 
@@ -1077,6 +1118,13 @@ async function handleAPI(request, pathname) {
       let body = {};
       try { body = await parseJSONBody(request); } catch (e) {}
       const files = await readFileIndex(token);
+      const missingFiles = await validatePrototypeReferences(token, files);
+      if (missingFiles.length > 0) {
+        return jsonResponse({
+          error: `有 ${missingFiles.length} 个被引用的资源文件缺失，请重新上传完整 Axure 发布目录`,
+          missingFiles: missingFiles.slice(0, 50),
+        }, 400);
+      }
       const requestedEntry = sanitizePath(body.entryPath || meta.entryPath || '');
       const entryPath = findEntryPath(files, requestedEntry);
       const hasIndex = !!entryPath;

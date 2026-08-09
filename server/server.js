@@ -72,6 +72,62 @@ function protoDir(token) {
   return path.resolve(path.join(STORAGE_DIR, token));
 }
 
+function resolveRelativeAsset(fromPath, ref) {
+  if (!ref) return '';
+  const value = String(ref).trim().split('#')[0].split('?')[0];
+  if (!value || value.startsWith('#')) return '';
+  if (/^(?:https?:)?\/\//i.test(value)) return '';
+  if (/^(?:data|blob|mailto|javascript):/i.test(value)) return '';
+  if (value.startsWith('/')) return sanitizePath(value);
+  const dir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/') + 1) : '';
+  return sanitizePath(path.posix.normalize(dir + value));
+}
+
+async function listPrototypeFiles(dir, current = '') {
+  if (!existsSync(dir)) return [];
+  const entries = await fs.readdir(path.join(dir, current), { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    if (entry.name === 'meta.json') continue;
+    const rel = current ? `${current}/${entry.name}` : entry.name;
+    const full = path.join(dir, rel);
+    if (entry.isDirectory()) {
+      files.push(...await listPrototypeFiles(dir, rel));
+    } else if (entry.isFile()) {
+      files.push(rel);
+    }
+  }
+  return files;
+}
+
+async function validatePrototypeReferences(dir) {
+  const files = await listPrototypeFiles(dir);
+  const existing = new Set(files);
+  const missing = new Set();
+  const textFiles = files.filter(filePath => /\.(html?|css)$/i.test(filePath));
+
+  for (const filePath of textFiles) {
+    const full = path.join(dir, filePath);
+    const text = await fs.readFile(full, 'utf8').catch(() => '');
+    const refs = [];
+
+    if (/\.html?$/i.test(filePath)) {
+      const attrMatches = text.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi);
+      for (const match of attrMatches) refs.push(match[1]);
+    }
+
+    const cssMatches = text.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/gi);
+    for (const match of cssMatches) refs.push(match[1]);
+
+    for (const ref of refs) {
+      const resolved = resolveRelativeAsset(filePath, ref);
+      if (resolved && !existing.has(resolved)) missing.add(resolved);
+    }
+  }
+
+  return [...missing].sort();
+}
+
 async function readMeta(token) {
   const metaPath = path.join(STORAGE_DIR, token, 'meta.json');
   if (!existsSync(metaPath)) return null;
@@ -1151,6 +1207,15 @@ async function handleAPI(req, res, urlParts) {
         const rawBody = (await readBody(req)).toString();
         body = rawBody ? JSON.parse(rawBody) : {};
       } catch (e) {}
+
+      const missingFiles = await validatePrototypeReferences(dir);
+      if (missingFiles.length > 0) {
+        sendJSON(res, 400, {
+          error: `有 ${missingFiles.length} 个被引用的资源文件缺失，请重新上传完整 Axure 发布目录`,
+          missingFiles: missingFiles.slice(0, 50),
+        });
+        return;
+      }
 
       const requestedEntry = sanitizePath(body.entryPath || meta.entryPath || '');
       let entryPath = '';

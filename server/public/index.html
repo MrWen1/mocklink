@@ -2408,31 +2408,55 @@ async function handleFiles(files) {
 
   progStatus.textContent = '上传文件中...';
   let done = 0, failed = 0;
+  const failedPaths = [];
   await pMap(fileObjs, async ({ file, path }) => {
     try {
-      const buf = await file.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      const chunks = [];
-      for (let i = 0; i < bytes.length; i += 8192) {
-        chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-      }
-      const b64 = btoa(chunks.join(''));
-      const r = await authFetch(`${API}/api/prototypes/${token}/files`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, content: b64 })
-      });
-      if (!r.ok) {
-        failed++;
-        if (r.status === 403) {
-          const msg = await responseError(r);
-          throw new Error(msg);
+      let uploaded = false;
+      let lastError = '';
+      for (let attempt = 0; attempt < 3 && !uploaded; attempt++) {
+        try {
+          const buf = await file.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          const chunks = [];
+          for (let i = 0; i < bytes.length; i += 8192) {
+            chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+          }
+          const b64 = btoa(chunks.join(''));
+          const r = await authFetch(`${API}/api/prototypes/${token}/files`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, content: b64 })
+          });
+          if (r.ok) {
+            uploaded = true;
+          } else {
+            lastError = await responseError(r);
+            if (r.status === 403) throw new Error(lastError);
+          }
+        } catch (e) {
+          lastError = e.message || '上传失败';
+          if (String(lastError).includes('配额')) throw e;
         }
       }
-    } catch (e) { failed++; }
+      if (!uploaded) {
+        failed++;
+        failedPaths.push(`${path}（${lastError || '上传失败'}）`);
+      }
+    } catch (e) {
+      failed++;
+      failedPaths.push(`${path}（${e.message || '上传失败'}）`);
+    }
     done++;
     progDone.textContent = done;
     progFill.style.width = (done / fileObjs.length * 100) + '%';
-  }, 5);
+    progStatus.textContent = failed > 0 ? `上传文件中...（${failed} 个失败）` : '上传文件中...';
+  }, 3);
+
+  if (failed > 0) {
+    const sample = failedPaths.slice(0, 5).join('；');
+    showToast(`有 ${failed} 个资源未上传，已停止发布。请重新上传。失败示例：${sample}`, 'error');
+    resetUploadArea();
+    return;
+  }
 
   progStatus.textContent = '发布中...';
   try {

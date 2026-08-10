@@ -83,6 +83,19 @@ function resolveRelativeAsset(fromPath, ref) {
   return sanitizePath(path.posix.normalize(dir + value));
 }
 
+function isIgnorableMissingPrototypeResource(relPath) {
+  const p = sanitizePath(relPath).toLowerCase();
+  return (
+    p.startsWith('googlefonts/') ||
+    p === 'resources/css/pie.htc' ||
+    p.startsWith('resources/css/previewfonts/') ||
+    p.startsWith('resources/css/images/ui-') ||
+    p === 'resources/axurerp_pagescript.js' ||
+    p.startsWith('plugins/handoff/') ||
+    p.startsWith('plugins/sitemap/styles/images/')
+  );
+}
+
 async function listPrototypeFiles(dir, current = '') {
   if (!existsSync(dir)) return [];
   const entries = await fs.readdir(path.join(dir, current), { withFileTypes: true });
@@ -121,7 +134,9 @@ async function validatePrototypeReferences(dir) {
 
     for (const ref of refs) {
       const resolved = resolveRelativeAsset(filePath, ref);
-      if (resolved && !existing.has(resolved)) missing.add(resolved);
+      if (resolved && !existing.has(resolved) && !isIgnorableMissingPrototypeResource(resolved)) {
+        missing.add(resolved);
+      }
     }
   }
 

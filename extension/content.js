@@ -163,6 +163,18 @@ function extractCssUrls(cssText, cssFilePath, resources, cssFilesToParse, baseUr
   }
 }
 
+function addAxurePageSupportFiles(pagePath, resources, cssFilesToParse, baseUrl) {
+  if (!pagePath || !/\.html?$/i.test(pagePath)) return;
+  const clean = normalizePath(String(pagePath).split('?')[0].split('#')[0]);
+  if (!clean || /^(?:index|start|start_with_pages|start_c_\d*)\.html?$/i.test(clean)) return;
+  const stem = clean.replace(/\.html?$/i, '');
+  const dataPath = normalizePath(`files/${stem}/data.js`);
+  const stylePath = normalizePath(`files/${stem}/styles.css`);
+  addResource(resources, window.__axureResourceUrls, dataPath, baseUrl);
+  addResource(resources, window.__axureResourceUrls, stylePath, baseUrl);
+  cssFilesToParse.add(stylePath);
+}
+
 // ===== 解析 HTML 页面中的资源引用 =====
 function extractHtmlResources(doc, pagePath, resources, cssFilesToParse, htmlPagesToParse, baseUrl) {
   const pageDir = pagePath.includes('/') ? pagePath.substring(0, pagePath.lastIndexOf('/') + 1) : '';
@@ -177,7 +189,10 @@ function extractHtmlResources(doc, pagePath, resources, cssFilesToParse, htmlPag
         resources.add(resolved);
         addResource(resources, window.__axureResourceUrls, resolved, baseUrl);
         if (resolved.endsWith('.css')) cssFilesToParse.add(resolved);
-        if (resolved.endsWith('.html')) htmlPagesToParse.add(resolved);
+        if (resolved.endsWith('.html')) {
+          htmlPagesToParse.add(resolved);
+          addAxurePageSupportFiles(resolved, resources, cssFilesToParse, baseUrl);
+        }
       }
     } catch (e) {}
   });
@@ -191,6 +206,7 @@ function extractHtmlResources(doc, pagePath, resources, cssFilesToParse, htmlPag
       if (resolved && isValidPath(resolved)) {
         addResource(resources, window.__axureResourceUrls, resolved, baseUrl);
         htmlPagesToParse.add(resolved);
+        addAxurePageSupportFiles(resolved, resources, cssFilesToParse, baseUrl);
       }
     }
   });
@@ -224,7 +240,15 @@ async function collectAllResources() {
   // 1. 添加当前页面
   const currentFile = getCurrentFilePath(baseUrl);
   addResource(resources, resourceUrls, currentFile, baseUrl, window.location.href);
-  if (currentFile.endsWith('.html')) htmlPagesToParse.add(currentFile);
+  if (currentFile.endsWith('.html')) {
+    htmlPagesToParse.add(currentFile);
+    addAxurePageSupportFiles(currentFile, resources, cssFilesToParse, baseUrl);
+  }
+
+  // Axure 必需数据文件。若读取失败，上传阶段会明确报出关键文件缺失，避免发布空白页。
+  addResource(resources, resourceUrls, 'data/document.js', baseUrl);
+  addResource(resources, resourceUrls, 'data/styles.css', baseUrl);
+  cssFilesToParse.add('data/styles.css');
 
   // 2. Performance API — 所有已加载的资源
   performance.getEntriesByType('resource').forEach(entry => {
@@ -276,6 +300,7 @@ async function collectAllResources() {
         if (path && !path.startsWith('http') && isValidPath(path)) {
           addResource(resources, resourceUrls, path, baseUrl);
           htmlPagesToParse.add(path);
+          addAxurePageSupportFiles(path, resources, cssFilesToParse, baseUrl);
         }
       }
       // 提取所有 .js 文件路径

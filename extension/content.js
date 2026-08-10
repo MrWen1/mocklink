@@ -1,6 +1,8 @@
 // MockLink Chrome 扩展 - 内容脚本
 // 检测 Axure 原型页面，全面收集所有资源文件路径
 
+const MOCKLINK_COLLECTOR_VERSION = '2.2.5';
+
 // ===== 检测当前页面是否为 Axure 原型 =====
 function detectAxure() {
   if (typeof window.$axure !== 'undefined') return true;
@@ -436,7 +438,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const name = isAxure ? getPrototypeName() : null;
     const baseUrl = isAxure ? getBaseUrl() : null;
     const url = window.location.href;
-    sendResponse({ isAxure, name, baseUrl, url });
+    sendResponse({ isAxure, name, baseUrl, url, collectorVersion: MOCKLINK_COLLECTOR_VERSION });
     return true;
   }
 
@@ -445,9 +447,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const baseUrl = getBaseUrl();
       const name = getPrototypeName();
       const entryPath = getCurrentFilePath(baseUrl);
-      sendResponse({ success: true, baseUrl, resources, name, entryPath });
+      sendResponse({ success: true, baseUrl, resources, name, entryPath, collectorVersion: MOCKLINK_COLLECTOR_VERSION });
     }).catch(error => {
-      sendResponse({ success: false, error: error.message });
+      sendResponse({ success: false, error: error.message, collectorVersion: MOCKLINK_COLLECTOR_VERSION });
     });
     return true;
   }

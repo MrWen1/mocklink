@@ -21,6 +21,9 @@ const result = document.getElementById('result');
 const shareInput = document.getElementById('shareInput');
 const errEl = document.getElementById('err');
 const hintEl = document.getElementById('hint');
+const versionText = document.getElementById('versionText');
+const EXTENSION_VERSION = chrome.runtime.getManifest().version;
+if (versionText) versionText.textContent = EXTENSION_VERSION;
 
 // 状态
 let detectedAxure = false;
@@ -90,6 +93,12 @@ async function detectCurrentTab() {
       }
 
       if (response && response.isAxure) {
+        if (response.collectorVersion && response.collectorVersion !== EXTENSION_VERSION) {
+          detectedAxure = false;
+          showDetectNotfound(`页面采集脚本仍是旧版本 ${response.collectorVersion}，请刷新 Axure 页面后再同步`);
+          hintEl.textContent = `当前扩展版本 ${EXTENSION_VERSION}。重新安装或更新扩展后，必须刷新已打开的 Axure 原型页面。`;
+          return;
+        }
         detectedAxure = true;
         detectedName = response.name || '未命名原型';
         showDetectFound(detectedName);
@@ -258,6 +267,12 @@ async function startSync(project) {
 
     if (chrome.runtime.lastError || !collectResponse || !collectResponse.success) {
       showError('收集文件失败: ' + (collectResponse?.error || chrome.runtime.lastError?.message || '未知错误'));
+      resetState();
+      return;
+    }
+
+    if (collectResponse.collectorVersion !== EXTENSION_VERSION) {
+      showError(`页面采集脚本版本不一致（页面 ${collectResponse.collectorVersion || '旧版本'}，扩展 ${EXTENSION_VERSION}）。请刷新 Axure 页面后再同步。`);
       resetState();
       return;
     }

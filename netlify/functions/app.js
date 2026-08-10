@@ -1204,8 +1204,9 @@ async function handleAPI(request, pathname) {
       const files = await readFileIndex(token);
       const missingFiles = await validatePrototypeReferences(token, files);
       if (missingFiles.length > 0) {
+        const sample = missingFiles.slice(0, 5).join('；');
         return jsonResponse({
-          error: `有 ${missingFiles.length} 个被引用的资源文件缺失，请重新上传完整 Axure 发布目录`,
+          error: `有 ${missingFiles.length} 个关键资源文件缺失，请重新上传完整 Axure 发布目录。缺失示例：${sample}`,
           missingFiles: missingFiles.slice(0, 50),
         }, 400);
       }

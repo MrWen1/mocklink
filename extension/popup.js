@@ -393,6 +393,23 @@ async function fetchResourceAsUploadFile(item, baseUrl) {
   };
 }
 
+function isIgnorableMissingPrototypeResource(relPath) {
+  const p = String(relPath || '')
+    .replace(/\\/g, '/')
+    .replace(/\.\./g, '')
+    .replace(/^\/+/, '')
+    .toLowerCase();
+  return (
+    p.startsWith('googlefonts/') ||
+    p === 'resources/css/pie.htc' ||
+    p.startsWith('resources/css/previewfonts/') ||
+    p.startsWith('resources/css/images/ui-') ||
+    p === 'resources/axurerp_pagescript.js' ||
+    p.startsWith('plugins/handoff/') ||
+    p.startsWith('plugins/sitemap/styles/images/')
+  );
+}
+
 async function postJSONWithRetry(url, body, retries = 3) {
   let lastError = '';
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -451,7 +468,7 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
         currentBytes += file.size;
       }
     } catch (e) {
-      if (e.isNotFound) {
+      if (e.isNotFound && isIgnorableMissingPrototypeResource(path)) {
         skipped++;
         skippedPaths.push(path);
       } else {

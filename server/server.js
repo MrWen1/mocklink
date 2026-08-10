@@ -1276,8 +1276,9 @@ async function handleAPI(req, res, urlParts) {
 
       const missingFiles = await validatePrototypeReferences(dir);
       if (missingFiles.length > 0) {
+        const sample = missingFiles.slice(0, 5).join('；');
         sendJSON(res, 400, {
-          error: `有 ${missingFiles.length} 个被引用的资源文件缺失，请重新上传完整 Axure 发布目录`,
+          error: `有 ${missingFiles.length} 个关键资源文件缺失，请重新上传完整 Axure 发布目录。缺失示例：${sample}`,
           missingFiles: missingFiles.slice(0, 50),
         });
         return;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MockLink - Axure 原型一键同步",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "在浏览器中直接将 Axure 发布的 HTML 原型一键同步到 MockLink 托管平台",
   "action": {
     "default_popup": "popup.html",

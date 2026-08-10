@@ -316,7 +316,7 @@ async function startSync(project) {
     }
 
     // 4. 发布
-    showProgress('发布中...', resources.length, resources.length);
+    showProgress('文件已全部上传，正在发布...', resources.length, resources.length);
     const pubRes = await fetch(`${server}/api/prototypes/${token}/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -338,10 +338,11 @@ async function startSync(project) {
     const shareUrl = server + pubData.shareUrl;
 
     // 5. 显示结果
+    showProgress('同步成功！', resources.length, resources.length);
     progress.classList.remove('show');
     result.classList.add('show');
     shareInput.value = shareUrl;
-    statusText.textContent = updateToken ? '项目更新完成！' : '新项目同步完成！';
+    statusText.textContent = '同步成功！';
 
     // 自动复制
     let hintMsg = '链接已自动复制到剪贴板';

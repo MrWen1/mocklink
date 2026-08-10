@@ -559,16 +559,19 @@ function isIgnorableMissingPrototypeResource(relPath) {
 }
 
 async function validatePrototypeReferences(token, files) {
-  const existing = new Set(files.map(file => file.path));
+  const byPath = new Map(files.map(file => [file.path, file]));
+  const existing = new Set(byPath.keys());
   const missing = new Set();
   const textFiles = files
     .map(file => file.path)
     .filter(filePath => /\.(html?|css)$/i.test(filePath));
 
   for (const filePath of textFiles) {
-    const file = await getPrototypeFile(token, filePath);
-    if (!file) continue;
-    const text = Buffer.from(file.data).toString('utf8');
+    const item = byPath.get(filePath);
+    if (!item) continue;
+    const data = await store.get(item.key, { type: 'arrayBuffer' });
+    if (!data) continue;
+    const text = Buffer.from(data).toString('utf8');
     const refs = [];
 
     if (/\.html?$/i.test(filePath)) {

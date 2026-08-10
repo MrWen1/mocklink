@@ -1084,16 +1084,13 @@
           <polyline points="17 8 12 3 7 8"/>
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        <div class="upload-text" id="uploadAreaText">点击选择 Axure 原型文件夹</div>
+        <div class="upload-text" id="uploadAreaText">点击选择新的原型文件夹</div>
         <div class="upload-hint">或拖拽文件夹到此处</div>
       </div>
-      <div class="upload-info">
+      <div class="upload-info" id="uploadInfo">
         <b>使用说明：</b><br>
-        1. 在 Axure RP 中「发布 → 本地」生成 HTML 目录<br>
-        2. 选择整个文件夹上传，保持目录结构<br>
-        3. 上传完成后自动生成分享链接<br>
-        4. 支持 Axure RP8 / RP9 / RP10 / RP11<br>
-        5. 也可使用 Chrome 扩展一键同步上传
+        1. 点击右上角「Chrome 扩展」，下载并安装 MockLink 扩展<br>
+        2. 打开 Axure 原型页面，使用扩展一键同步上传；后续修改后再次同步，即可实时更新内容
       </div>
       <div class="upload-progress" id="uploadProgress" style="display:none;">
         <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
@@ -2180,11 +2177,15 @@ function closeModal(id) {
 function openUploadModal(title) {
   const isUpdate = !!updatingToken;
   document.getElementById('uploadModalTitle').textContent = title;
-  document.getElementById('uploadAreaText').textContent = isUpdate ? '点击选择新的原型文件夹' : '点击选择 Axure 原型文件夹';
+  document.getElementById('uploadAreaText').textContent = '点击选择新的原型文件夹';
   document.getElementById('uploadProgress').style.display = 'none';
   document.getElementById('progFill').style.width = '0%';
-  document.getElementById('projectNameField').style.display = isUpdate ? 'none' : 'block';
-  document.getElementById('groupSelectField').style.display = isUpdate ? 'none' : 'block';
+  document.getElementById('projectNameField').style.display = 'none';
+  document.getElementById('groupSelectField').style.display = 'none';
+  document.getElementById('uploadArea').style.display = isUpdate ? 'block' : 'none';
+  document.getElementById('uploadInfo').innerHTML = isUpdate
+    ? '<b>使用说明：</b><br>1. 选择新的 Axure 原型文件夹，系统会保持原分享链接不变<br>2. 上传完成后自动更新线上内容<br>3. 推荐优先使用 Chrome 扩展进行一键同步'
+    : '<b>使用说明：</b><br>1. 点击右上角「Chrome 扩展」，下载并安装 MockLink 扩展<br>2. 打开 Axure 原型页面，使用扩展一键同步上传；后续修改后再次同步，即可实时更新内容';
   if (!isUpdate) {
     document.getElementById('projectNameInput').value = '';
   }

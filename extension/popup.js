@@ -459,6 +459,7 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
   let skipped = 0;
   const failedPaths = [];
   const skippedPaths = [];
+  const fetchedFiles = [];
   const batches = [];
   let current = [];
   let currentBytes = 0;
@@ -470,18 +471,11 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
     currentBytes = 0;
   }
 
-  await pMap(resources, async (item) => {
+  await pMap(resources, async (item, index) => {
     const path = typeof item === 'string' ? item : item.path;
     try {
       const file = await fetchResourceAsUploadFile(item, baseUrl);
-      if (file.size > maxBatchBytes) {
-        flushBatch();
-        batches.push([file]);
-      } else {
-        if (current.length >= maxBatchFiles || currentBytes + file.size > maxBatchBytes) flushBatch();
-        current.push(file);
-        currentBytes += file.size;
-      }
+      fetchedFiles.push({ ...file, order: index });
     } catch (e) {
       if (e.isNotFound && isIgnorableMissingPrototypeResource(path)) {
         skipped++;
@@ -492,9 +486,21 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
       }
     }
   }, 6);
+
+  fetchedFiles.sort((a, b) => a.order - b.order);
+  for (const file of fetchedFiles) {
+    if (file.size > maxBatchBytes) {
+      flushBatch();
+      batches.push([file]);
+    } else {
+      if (current.length >= maxBatchFiles || currentBytes + file.size > maxBatchBytes) flushBatch();
+      current.push(file);
+      currentBytes += file.size;
+    }
+  }
   flushBatch();
 
-  await pMap(batches, async (batch) => {
+  for (const batch of batches) {
     try {
       if (batch.length === 1 && batch[0].size > maxBatchBytes) {
         await postJSONWithRetry(`${server}/api/prototypes/${token}/files`, {
@@ -513,7 +519,7 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, onP
       done += batch.length;
     }
     onProgress(done, resources.length, failed);
-  }, 4);
+  }
 
   return { failed, failedPaths, skipped, skippedPaths };
 }

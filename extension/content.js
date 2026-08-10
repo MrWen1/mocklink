@@ -1,7 +1,7 @@
 // MockLink Chrome 扩展 - 内容脚本
 // 检测 Axure 原型页面，全面收集所有资源文件路径
 
-const MOCKLINK_COLLECTOR_VERSION = '2.2.5';
+const MOCKLINK_COLLECTOR_VERSION = '2.2.6';
 
 // ===== 检测当前页面是否为 Axure 原型 =====
 function detectAxure() {

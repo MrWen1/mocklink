@@ -26,6 +26,25 @@ body {
 }
 .field input:focus { border-color: var(--accent); }
 
+.auth-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;
+  margin-bottom: 0.75rem; padding: 0.7rem 0.8rem;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+}
+.auth-label { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.16rem; }
+.auth-user {
+  max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.82rem; font-weight: 600; color: var(--ink);
+}
+.auth-card.authed { border-color: rgba(63, 141, 97, 0.45); background: rgba(63, 141, 97, 0.05); }
+.auth-actions { display: flex; gap: 0.35rem; flex: 0 0 auto; }
+.auth-actions button {
+  border: 1px solid var(--rule); background: var(--bg); color: var(--ink);
+  border-radius: 7px; padding: 0.38rem 0.5rem; cursor: pointer; font-size: 0.72rem; font-weight: 600;
+}
+.auth-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.auth-actions button.danger { color: var(--danger); }
+
 .project-field { position: relative; }
 .project-select { position: relative; }
 .project-select input {

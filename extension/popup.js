@@ -1,10 +1,9 @@
 // MockLink Chrome 扩展 - 弹窗逻辑
 // 检测 Axure 原型页面，一键同步到 MockLink
 
-const DEFAULT_SERVER = 'http://localhost:3000';
+const DEFAULT_SERVER = 'https://mocklink.netlify.app';
 
 // DOM 引用
-const serverInput = document.getElementById('server');
 const projectInput = document.getElementById('projectInput');
 const projectDropdown = document.getElementById('projectDropdown');
 const projectClearBtn = document.getElementById('projectClearBtn');
@@ -22,6 +21,10 @@ const shareInput = document.getElementById('shareInput');
 const errEl = document.getElementById('err');
 const hintEl = document.getElementById('hint');
 const versionText = document.getElementById('versionText');
+const authCard = document.getElementById('authCard');
+const authUserEl = document.getElementById('authUser');
+const authBtn = document.getElementById('authBtn');
+const revokeAuthBtn = document.getElementById('revokeAuthBtn');
 const EXTENSION_VERSION = chrome.runtime.getManifest().version;
 if (versionText) versionText.textContent = EXTENSION_VERSION;
 
@@ -31,19 +34,16 @@ let detectedName = null;
 let isSyncing = false;
 let projects = [];
 let selectedProject = { mode: 'new', token: null, name: '' };
+let authToken = null;
+let currentUser = null;
 
 // ===== 初始化 =====
-// 加载服务器地址
-chrome.storage.local.get(['server'], (r) => {
-  serverInput.value = r.server || DEFAULT_SERVER;
+chrome.storage.local.get(['authToken'], async (r) => {
+  authToken = r.authToken || await readPlatformCookieToken();
+  await refreshAuthState();
   updateSyncButtonText();
   loadProjects();
   detectCurrentTab();
-});
-serverInput.addEventListener('change', () => {
-  chrome.storage.local.set({ server: serverInput.value.trim() });
-  clearSelectedProject();
-  loadProjects();
 });
 
 projectInput.addEventListener('focus', () => {
@@ -66,6 +66,107 @@ projectClearBtn.addEventListener('click', () => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.project-field')) hideProjectDropdown();
 });
+
+authBtn.addEventListener('click', async () => {
+  const token = await readPlatformCookieToken();
+  if (token) {
+    authToken = token;
+    await chrome.storage.local.set({ authToken });
+    await refreshAuthState();
+    await loadProjects();
+    return;
+  }
+  chrome.tabs.create({ url: `${DEFAULT_SERVER}/login.html?from=extension` });
+  hintEl.textContent = '请在打开的页面完成登录，登录后回到扩展点击「刷新授权」。';
+  authBtn.textContent = '刷新授权';
+});
+
+revokeAuthBtn.addEventListener('click', async () => {
+  await cancelAuthorization();
+});
+
+function getServer() {
+  return DEFAULT_SERVER;
+}
+
+function withAuthHeaders(extra = {}) {
+  return authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = withAuthHeaders(options.headers || {});
+  return fetch(`${getServer()}${path}`, { ...options, headers });
+}
+
+function readPlatformCookieToken() {
+  return new Promise(resolve => {
+    if (!chrome.cookies) return resolve(null);
+    chrome.cookies.get({ url: DEFAULT_SERVER, name: 'wc_auth_token' }, cookie => {
+      resolve(cookie && cookie.value ? decodeURIComponent(cookie.value) : null);
+    });
+  });
+}
+
+async function refreshAuthState() {
+  if (!authToken) authToken = await readPlatformCookieToken();
+  if (!authToken) {
+    currentUser = null;
+    await chrome.storage.local.remove('authToken');
+    renderAuthState();
+    return false;
+  }
+  try {
+    const res = await apiFetch('/api/auth/me');
+    const data = await res.json();
+    currentUser = data.user || null;
+    if (!currentUser) {
+      authToken = null;
+      await chrome.storage.local.remove('authToken');
+      renderAuthState();
+      return false;
+    }
+    await chrome.storage.local.set({ authToken });
+    renderAuthState();
+    return true;
+  } catch (e) {
+    currentUser = null;
+    renderAuthState('授权状态检查失败');
+    return false;
+  }
+}
+
+function renderAuthState(message = '') {
+  if (currentUser) {
+    authCard.classList.add('authed');
+    authUserEl.textContent = currentUser.name || currentUser.email || '已授权账号';
+    authBtn.textContent = '刷新授权';
+    revokeAuthBtn.style.display = '';
+    if (message) hintEl.textContent = message;
+  } else {
+    authCard.classList.remove('authed');
+    authUserEl.textContent = '未授权';
+    authBtn.textContent = '授权登录';
+    revokeAuthBtn.style.display = 'none';
+    hintEl.textContent = message || '请先授权登录 MockLink 账号，项目会同步到该账号下。';
+  }
+  syncBtn.disabled = !detectedAxure || !currentUser;
+}
+
+async function cancelAuthorization() {
+  try {
+    if (authToken) await apiFetch('/api/auth/logout', { method: 'POST' });
+  } catch (e) {}
+  authToken = null;
+  currentUser = null;
+  await chrome.storage.local.remove('authToken');
+  if (chrome.cookies) {
+    chrome.cookies.remove({ url: DEFAULT_SERVER, name: 'wc_auth_token' });
+  }
+  projects = [];
+  clearSelectedProject();
+  renderProjectDropdown('');
+  renderAuthState('已取消授权。');
+}
 
 // ===== 检测当前页面是否为 Axure 原型 =====
 async function detectCurrentTab() {
@@ -102,7 +203,7 @@ async function detectCurrentTab() {
         detectedAxure = true;
         detectedName = response.name || '未命名原型';
         showDetectFound(detectedName);
-        hintEl.textContent = '点击「一键同步」将当前原型上传到 MockLink';
+        hintEl.textContent = currentUser ? '点击「一键同步」将当前原型上传到已授权账号。' : '请先授权登录 MockLink 账号。';
       } else {
         detectedAxure = false;
         showDetectNotfound('当前页面不是 Axure 原型');
@@ -117,7 +218,7 @@ async function detectCurrentTab() {
 function showDetectFound(name) {
   detectStatus.className = 'detect-status found';
   detectStatus.innerHTML = '<div class="detect-icon"></div><span>检测到 Axure 原型：<b>' + escapeHtml(name) + '</b></span>';
-  syncBtn.disabled = false;
+  syncBtn.disabled = !currentUser;
 }
 
 function showDetectNotfound(msg) {
@@ -128,11 +229,15 @@ function showDetectNotfound(msg) {
 
 // ===== 项目选择 =====
 async function loadProjects(selectToken) {
-  const server = serverInput.value.trim().replace(/\/$/, '');
-  if (!server) return;
+  if (!authToken) {
+    projects = [];
+    projectHint.textContent = '授权登录后可加载该账号下的项目列表。';
+    renderProjectDropdown(projectInput.value);
+    return;
+  }
   try {
     projectHint.textContent = '正在加载项目列表...';
-    const res = await fetch(`${server}/api/prototypes`);
+    const res = await apiFetch('/api/prototypes');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     projects = Array.isArray(data.prototypes) ? data.prototypes : [];
@@ -253,8 +358,12 @@ async function startSync(project) {
   result.classList.remove('show');
   syncBtn.disabled = true;
 
-  const server = serverInput.value.trim().replace(/\/$/, '');
-  if (!server) { showError('请填写服务器地址'); resetState(); return; }
+  const server = getServer();
+  if (!await refreshAuthState()) {
+    showError('请先授权登录 MockLink 账号');
+    resetState();
+    return;
+  }
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -294,14 +403,14 @@ async function startSync(project) {
 
     let token;
     if (updateToken) {
-      const res = await fetch(`${server}/api/prototypes/${updateToken}/update`, {
+      const res = await apiFetch(`/api/prototypes/${updateToken}/update`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: protoName })
       });
       if (!res.ok) throw new Error('更新失败: HTTP ' + res.status);
       token = updateToken;
     } else {
-      const res = await fetch(`${server}/api/prototypes`, {
+      const res = await apiFetch('/api/prototypes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: protoName })
       });
@@ -332,7 +441,7 @@ async function startSync(project) {
 
     // 4. 发布
     showProgress('文件已全部上传，正在发布...', resources.length, resources.length);
-    const pubRes = await fetch(`${server}/api/prototypes/${token}/publish`, {
+    const pubRes = await apiFetch(`/api/prototypes/${token}/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entryPath })
@@ -431,7 +540,7 @@ async function postJSONWithRetry(url, body, retries = 3) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(body),
       });
       if (res.ok) return;
@@ -552,7 +661,7 @@ function showError(msg) {
 
 function resetState() {
   isSyncing = false;
-  syncBtn.disabled = !detectedAxure;
+  syncBtn.disabled = !detectedAxure || !currentUser;
 }
 
 function escapeHtml(str) {

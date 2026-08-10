@@ -1,7 +1,7 @@
 // MockLink Chrome 扩展 - 内容脚本
 // 检测 Axure 原型页面，全面收集所有资源文件路径
 
-const MOCKLINK_COLLECTOR_VERSION = '2.2.6';
+const MOCKLINK_COLLECTOR_VERSION = '2.3.0';
 
 // ===== 检测当前页面是否为 Axure 原型 =====
 function detectAxure() {
@@ -38,10 +38,16 @@ function getCurrentFilePath(baseUrl) {
 
 // ===== 获取原型名称 =====
 function getPrototypeName() {
-  const title = document.title || '';
-  if (title && title !== 'index' && title !== 'Untitled Document') {
-    const parts = title.split(/\s*[-–—]\s*/);
-    return parts[0].trim() || title.trim();
+  const previewInfo = window.PREVIEW_INFO || {};
+  const fileName = previewInfo.fileName || previewInfo.filename || '';
+  if (fileName) {
+    try {
+      const decoded = decodeURIComponent(String(fileName).replace(/\+/g, ' ')).trim();
+      if (decoded) return decoded;
+    } catch (e) {
+      const raw = String(fileName).trim();
+      if (raw) return raw;
+    }
   }
   const url = window.location.href;
   const parts = url.replace(/\/$/, '').split('/');

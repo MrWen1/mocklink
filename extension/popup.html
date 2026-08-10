@@ -13,9 +13,15 @@
     </div>
   </div>
 
-  <div class="field">
-    <label>同步到平台地址</label>
-    <input id="server" placeholder="http://localhost:3000">
+  <div class="auth-card" id="authCard">
+    <div>
+      <div class="auth-label">同步账号</div>
+      <div class="auth-user" id="authUser">未授权</div>
+    </div>
+    <div class="auth-actions">
+      <button type="button" id="authBtn">授权登录</button>
+      <button type="button" id="revokeAuthBtn" class="danger" style="display:none;">取消授权</button>
+    </div>
   </div>
 
   <div class="field project-field">

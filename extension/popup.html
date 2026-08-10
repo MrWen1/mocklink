@@ -13,8 +13,8 @@
     </div>
   </div>
 
-  <div class="auth-card" id="authCard">
-    <div>
+  <div class="card auth-card" id="authCard">
+    <div class="auth-info">
       <div class="auth-label">同步账号</div>
       <div class="auth-user" id="authUser">未授权</div>
     </div>
@@ -24,14 +24,16 @@
     </div>
   </div>
 
-  <div class="field project-field">
-    <label>项目</label>
-    <div class="project-select">
-      <input id="projectInput" placeholder="请选择或搜索需要更新的项目">
-      <button id="projectClearBtn" class="project-clear" title="清空选择">×</button>
-      <div id="projectDropdown" class="project-dropdown"></div>
+  <div class="card project-card">
+    <div class="project-field">
+      <label>项目</label>
+      <div class="project-select">
+        <input id="projectInput" placeholder="请选择或搜索需要更新的项目">
+        <button id="projectClearBtn" class="project-clear" title="清空选择">×</button>
+        <div id="projectDropdown" class="project-dropdown"></div>
+      </div>
+      <div id="projectHint" class="project-hint">可选择已有项目进行更新，或新建项目上传。</div>
     </div>
-    <div id="projectHint" class="project-hint">可选择已有项目进行更新，或新建项目上传。</div>
   </div>
 
   <!-- 检测状态 -->

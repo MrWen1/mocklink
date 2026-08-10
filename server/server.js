@@ -461,9 +461,12 @@ async function listPrototypeMetas() {
   return items;
 }
 
-async function getUserUsage(userId) {
+async function getUserUsage(userId, user) {
   const items = await listPrototypeMetas();
-  const owned = items.filter(item => item.meta.ownerId === userId);
+  const isAdmin = user && user.role === 'admin';
+  const owned = items.filter(item =>
+    item.meta.ownerId === userId || (isAdmin && !item.meta.ownerId)
+  );
   return {
     projectCount: owned.length,
     storageBytes: owned.reduce((sum, item) => sum + item.sizeBytes, 0),
@@ -473,7 +476,7 @@ async function getUserUsage(userId) {
 async function assertUserQuota(user, deltaBytes = 0, deltaProjects = 0) {
   if (!user) return { ok: true };
   const quota = user.quota || DEFAULT_QUOTA;
-  const usage = await getUserUsage(user.id);
+  const usage = await getUserUsage(user.id, user);
   if (quota.projectLimit >= 0 && usage.projectCount + deltaProjects > quota.projectLimit) {
     return { ok: false, error: `项目数量已达配额上限（${quota.projectLimit} 个）` };
   }
@@ -674,7 +677,7 @@ async function handleAPI(req, res, urlParts) {
   if (pathname === '/api/auth/me' && req.method === 'GET') {
     const user = await getAuthUser(req);
     if (!user) { sendJSON(res, 200, { user: null }); return; }
-    const usage = await getUserUsage(user.id);
+    const usage = await getUserUsage(user.id, user);
     sendJSON(res, 200, { user: publicUser(user), usage });
     return;
   }
@@ -685,7 +688,7 @@ async function handleAPI(req, res, urlParts) {
     const users = await readUsers();
     const data = [];
     for (const user of users) {
-      const usage = await getUserUsage(user.id);
+      const usage = await getUserUsage(user.id, user);
       data.push({ ...publicUser(user), usage });
     }
     sendJSON(res, 200, { users: data });
@@ -726,7 +729,7 @@ async function handleAPI(req, res, urlParts) {
       };
       users.push(user);
       await writeUsers(users);
-      sendJSON(res, 200, { user: publicUser(user), usage: await getUserUsage(user.id) });
+      sendJSON(res, 200, { user: publicUser(user), usage: await getUserUsage(user.id, user) });
     } catch (e) {
       sendJSON(res, 500, { error: e.message });
     }
@@ -772,7 +775,7 @@ async function handleAPI(req, res, urlParts) {
         storageLimitBytes: Number.isFinite(storageLimitMB) ? Math.max(-1, Math.floor(storageLimitMB * 1024 * 1024)) : (users[idx].quota?.storageLimitBytes ?? DEFAULT_QUOTA.storageLimitBytes),
       };
       await writeUsers(users);
-      sendJSON(res, 200, { user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id) });
+      sendJSON(res, 200, { user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id, users[idx]) });
     } catch (e) {
       sendJSON(res, 500, { error: e.message });
     }
@@ -836,7 +839,7 @@ async function handleAPI(req, res, urlParts) {
         storageLimitBytes: Number.isFinite(storageLimitMB) ? Math.max(-1, Math.floor(storageLimitMB * 1024 * 1024)) : (users[idx].quota?.storageLimitBytes ?? DEFAULT_QUOTA.storageLimitBytes),
       };
       await writeUsers(users);
-      sendJSON(res, 200, { user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id) });
+      sendJSON(res, 200, { user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id, users[idx]) });
     } catch (e) {
       sendJSON(res, 500, { error: e.message });
     }
@@ -1423,14 +1426,6 @@ async function handleShare(req, res, urlParts) {
 async function serveStatic(req, res, urlParts) {
   let pathname = urlParts.pathname;
   if (pathname === '/') pathname = '/index.html';
-  if (pathname === '/index.html') {
-    const user = await getAuthUser(req);
-    if (!user) {
-      res.writeHead(302, { Location: '/login.html' });
-      res.end();
-      return;
-    }
-  }
   const filePath = path.join(PUBLIC_DIR, sanitizePath(pathname));
   if (!path.resolve(filePath).startsWith(PUBLIC_DIR + path.sep)) {
     res.writeHead(403);

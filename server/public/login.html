@@ -58,7 +58,6 @@
     gap: 10px;
     margin-bottom: 34px;
   }
-  .brand img { display: none; }
   .brand h1 {
     margin: 0;
     font-size: 36px;
@@ -248,7 +247,6 @@
 <body>
   <main class="card">
     <div class="brand">
-      <img src="/logo.png" alt="MockLink" onerror="this.style.display='none'">
       <div>
         <h1>MockLink</h1>
         <p>Axure 原型托管管理后台</p>
@@ -319,7 +317,7 @@ async function checkLogin() {
     const res = await fetch('/api/auth/me');
     const data = await res.json();
     if (data.user) {
-      location.replace('/');
+      location.replace('/app.html');
       return;
     }
     localStorage.removeItem('wc_auth_token');
@@ -526,7 +524,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       return;
     }
     localStorage.setItem('wc_auth_token', data.token);
-    location.href = '/';
+    location.href = '/app.html';
   } catch (e) {
     err.textContent = e.message;
     err.classList.add('show');

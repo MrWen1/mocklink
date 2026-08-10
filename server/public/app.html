@@ -1,0 +1,2556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MockLink - Axure 原型托管</title>
+<style>
+  :root {
+    --bg: #f2f3f5;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --ink-secondary: #4a4a4a;
+    --muted: #919191;
+    --muted-light: #bfbfbf;
+    --rule: #e8e8e8;
+    --rule-light: #f0f0f0;
+    --accent: #3f8d61;
+    --accent-hover: #357a52;
+    --accent-bg: rgba(63, 141, 97, 0.08);
+    --danger: #fe0000;
+    --danger-bg: rgba(254, 0, 0, 0.06);
+    --danger-hover: #e60000;
+    --warning: #fa8c16;
+    --warning-bg: rgba(250, 140, 22, 0.08);
+    --radius: 8px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-lg: 0 4px 24px rgba(0,0,0,0.08);
+    --header-h: 56px;
+    --sidebar-w: 240px;
+    --transition: all 0.15s ease;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang SC", "SF Pro Text", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ===== Header ===== */
+  .header {
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    gap: 16px;
+  }
+  .header .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header .search {
+    flex: 1;
+    max-width: 400px;
+    position: relative;
+  }
+  .header .search input {
+    width: 100%;
+    height: 36px;
+    padding: 0 12px 0 36px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+    transition: var(--transition);
+  }
+  .header .search input:focus {
+    border-color: var(--accent);
+    background: var(--surface);
+  }
+  .header .search input::placeholder { color: var(--muted); }
+  .header .search .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--muted);
+  }
+  .header .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .header .nav-right .btn-icon {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-secondary);
+    transition: var(--transition);
+    position: relative;
+  }
+  .header .nav-right .btn-icon:hover {
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .header .nav-right .btn-icon svg { width: 18px; height: 18px; }
+  .header .nav-right .btn-icon .badge-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+
+  /* ===== Layout: Sidebar + Main ===== */
+  .layout {
+    display: flex;
+    min-height: calc(100vh - var(--header-h));
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--rule);
+    flex-shrink: 0;
+    padding: 16px 0;
+    overflow-y: auto;
+    position: sticky;
+    top: var(--header-h);
+    max-height: calc(100vh - var(--header-h));
+  }
+  .sidebar-section {
+    margin-bottom: 8px;
+  }
+  .sidebar-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 20px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sidebar-section-title .add-group-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: var(--transition);
+  }
+  .sidebar-section-title .add-group-btn:hover {
+    background: var(--bg);
+    color: var(--accent);
+  }
+  .sidebar-section-title .add-group-btn svg { width: 14px; height: 14px; }
+
+  .group-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 20px;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    font-size: 13px;
+    color: var(--ink-secondary);
+  }
+  .group-item:hover { background: var(--bg); color: var(--ink); }
+  .group-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+  .group-item .group-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: var(--muted);
+  }
+  .group-item.active .group-icon { color: var(--accent); }
+  .group-item .group-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .group-item .group-count {
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .group-item.active .group-count { background: rgba(63,141,97,0.12); color: var(--accent); }
+  .group-item .group-actions {
+    display: none;
+    gap: 2px;
+    margin-left: auto;
+  }
+  .group-item:hover .group-actions { display: flex; }
+  .group-item:hover .group-count { display: none; }
+  .group-item .group-actions button {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: var(--transition);
+  }
+  .group-item .group-actions button:hover { background: var(--rule-light); color: var(--ink); }
+  .group-item .group-actions button.danger:hover { color: var(--danger); }
+  .group-item .group-actions button svg { width: 12px; height: 12px; }
+
+  /* Sub-group (second level) */
+  .group-children {
+    display: none;
+  }
+  .group-children.expanded { display: block; }
+  .group-children .group-item {
+    padding-left: 48px;
+    font-size: 12px;
+  }
+  .group-expand {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: transform 0.15s;
+  }
+  .group-expand.expanded { transform: rotate(90deg); }
+  .group-expand svg { width: 12px; height: 12px; }
+  .group-expand-placeholder { width: 16px; flex-shrink: 0; }
+
+  /* ===== Main Content ===== */
+  .main {
+    flex: 1;
+    padding: 24px;
+    min-width: 0;
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 16px;
+  }
+  .toolbar h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .toolbar .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    height: 36px;
+    padding: 0 16px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--muted-light); background: var(--bg); }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  .btn-danger {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+  .btn-danger:hover {
+    background: var(--danger-bg);
+  }
+  .btn-sm {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .btn-ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--ink-secondary);
+  }
+  .btn-ghost:hover {
+    background: var(--bg);
+    border-color: var(--rule);
+  }
+  .user-pill {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 10px 0 4px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    color: var(--ink);
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .user-pill:hover { border-color: var(--accent); }
+  .user-pill.show { display: inline-flex; }
+  .user-pill .user-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    overflow: hidden;
+    flex: 0 0 auto;
+  }
+  .user-pill .user-avatar img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+  .user-pill .user-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .user-pill .chevron {
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+  }
+  .user-menu {
+    position: relative;
+    display: none;
+  }
+  .user-menu.show { display: inline-flex; }
+  .user-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 136px;
+    padding: 6px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+  }
+  .user-dropdown.show { display: block; }
+  .user-dropdown button {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .user-dropdown button:hover { background: var(--bg); }
+  .user-dropdown .danger { color: var(--danger); }
+  .quota-strip {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink-secondary);
+    font-size: 13px;
+  }
+  .quota-strip.show { display: flex; }
+  .quota-strip b { color: var(--ink); }
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .admin-table th, .admin-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--rule-light);
+    text-align: left;
+  }
+  .admin-table th { color: var(--muted); font-weight: 500; background: var(--bg); }
+  .admin-table .muted {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .admin-toolbar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 12px;
+  }
+  .admin-edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    margin-top: 4px;
+    text-align: left;
+  }
+  .admin-edit-grid .field-full { grid-column: 1 / -1; }
+  .admin-edit-grid label {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .admin-edit-grid input {
+    width: 100%;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    outline: none;
+    font-size: 13px;
+  }
+  .admin-edit-grid input:focus { border-color: var(--accent); }
+  .quota-input {
+    width: 90px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    outline: none;
+  }
+  .quota-input:focus { border-color: var(--accent); }
+
+  /* ===== Prototype List ===== */
+  .proto-list {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .proto-list-header {
+    display: grid;
+    grid-template-columns: 1fr 120px 100px 140px 200px;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--rule);
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .proto-item {
+    display: grid;
+    grid-template-columns: 1fr 120px 100px 140px 200px;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--rule-light);
+    align-items: center;
+    transition: var(--transition);
+    cursor: pointer;
+  }
+  .proto-item:last-child { border-bottom: none; }
+  .proto-item:hover { background: #fafbfa; }
+  .proto-item.disabled { cursor: default; }
+  .proto-item.disabled:hover { background: var(--surface); }
+
+  .proto-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .proto-name .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .proto-name .status-dot.ready { background: var(--accent); }
+  .proto-name .status-dot.cleared { background: var(--warning); }
+  .proto-name .status-dot.uploading { background: #1890ff; }
+  .proto-name .status-dot.unknown { background: var(--muted-light); }
+  .proto-name .name-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .proto-item:hover .name-text { color: var(--accent); }
+
+  .proto-status {
+    font-size: 12px;
+  }
+  .proto-status .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .proto-status .badge.ready { background: var(--accent-bg); color: var(--accent); }
+  .proto-status .badge.cleared { background: var(--warning-bg); color: var(--warning); }
+  .proto-status .badge.uploading { background: rgba(24,144,255,0.08); color: #1890ff; }
+
+  .proto-size {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .proto-date {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .proto-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+  .proto-actions .act-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: var(--transition);
+    position: relative;
+  }
+  .proto-actions .act-btn:hover { background: var(--bg); color: var(--ink); }
+  .proto-actions .act-btn.danger:hover { background: var(--danger-bg); color: var(--danger); }
+  .proto-actions .act-btn svg { width: 16px; height: 16px; }
+  .proto-actions .act-btn .tooltip {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 10;
+  }
+  .proto-actions .act-btn:hover .tooltip { opacity: 1; }
+
+  /* ===== Empty State ===== */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state p { font-size: 14px; }
+  .empty-state .hint { font-size: 12px; margin-top: 4px; color: var(--muted-light); }
+
+  /* ===== Loading ===== */
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .loading .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--rule);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-bottom: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== Modal ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.15s ease;
+  }
+  .modal-overlay.show { display: flex; }
+  #confirmModal { z-index: 1200; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    width: 90%;
+    max-width: 560px;
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .modal-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .modal-header .close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    transition: var(--transition);
+  }
+  .modal-header .close:hover { background: var(--bg); color: var(--ink); }
+  .modal-header .close svg { width: 18px; height: 18px; }
+
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Form field */
+  .form-field {
+    margin-bottom: 16px;
+  }
+  .form-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+    margin-bottom: 6px;
+  }
+  .form-field input,
+  .form-field select {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .form-field input { cursor: text; }
+  .form-field input:focus,
+  .form-field select:focus { border-color: var(--accent); }
+
+  /* Upload area in modal */
+  .upload-area {
+    border: 2px dashed var(--rule);
+    border-radius: var(--radius);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .upload-area:hover, .upload-area.drag {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .upload-area .upload-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 12px;
+    color: var(--muted);
+  }
+  .upload-area .upload-text {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .upload-area .upload-hint {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .upload-info {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+  .upload-info b { color: var(--ink-secondary); }
+
+  /* Progress in modal */
+  .upload-progress {
+    margin-top: 16px;
+  }
+  .upload-progress .prog-bar {
+    height: 6px;
+    background: var(--rule);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .upload-progress .prog-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0;
+    transition: width 0.2s;
+    border-radius: 999px;
+  }
+  .upload-progress .prog-text {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .upload-progress .prog-text b { color: var(--ink); }
+
+  /* Confirm dialog */
+  .confirm-content {
+    text-align: center;
+    padding: 8px 0;
+  }
+  .confirm-content .confirm-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .confirm-content .confirm-icon.danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
+  .confirm-content .confirm-icon.warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+  }
+  .confirm-content .confirm-icon svg { width: 24px; height: 24px; }
+  .confirm-content h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .confirm-content p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+  .confirm-content .confirm-message {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  #confirmModal.compact-form .modal { max-width: 520px !important; }
+  #confirmModal.compact-form .modal-body { padding: 12px 20px 10px; }
+  #confirmModal.compact-form .confirm-content { padding: 0; text-align: left; }
+  #confirmModal.compact-form .confirm-icon { display: none; }
+  #confirmModal.compact-form .confirm-content h4 { margin-bottom: 8px; }
+  #confirmModal.compact-form .modal-footer { padding: 10px 20px; }
+
+  /* Share dialog */
+  .share-content {
+    padding: 4px 0;
+  }
+  .share-content .share-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .share-content .share-link {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .share-content .share-link input {
+    flex: 1;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--bg);
+    font-family: ui-monospace, "SF Mono", monospace;
+    outline: none;
+  }
+  .share-content .share-link input:focus { border-color: var(--accent); }
+  .share-content .share-info {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Group create/edit dialog */
+  .group-form-field {
+    margin-bottom: 12px;
+  }
+  .group-form-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+    margin-bottom: 6px;
+  }
+  .group-form-field input, .group-form-field select {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+    transition: var(--transition);
+  }
+  .group-form-field input:focus, .group-form-field select:focus { border-color: var(--accent); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    z-index: 2000;
+    opacity: 0;
+    transition: all 0.25s ease;
+    pointer-events: none;
+    box-shadow: var(--shadow-lg);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.success { background: var(--accent); }
+  .toast.error { background: var(--danger); }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header { padding: 0 12px; }
+    .header .search { max-width: 200px; }
+    .sidebar { display: none; }
+    .main { padding: 12px; }
+    .proto-list-header { display: none; }
+    .proto-item {
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .proto-status, .proto-size, .proto-date { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header class="header">
+  <div class="logo" style="cursor:pointer" onclick="location.href='/'">
+    <span>MockLink</span>
+  </div>
+  <div class="search">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+    </svg>
+    <input type="text" id="searchInput" placeholder="搜索原型...">
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-ghost btn-sm" id="adminBtn" style="display:none;">账户管理</button>
+    <button class="btn btn-ghost btn-sm" id="loginBtn">登录 / 注册</button>
+    <button class="btn btn-ghost btn-sm" id="extensionBtn" title="下载 Chrome 扩展">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Chrome 扩展
+    </button>
+    <div class="user-menu" id="userMenu">
+      <button class="user-pill" id="userPill" type="button" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="user-dropdown" id="userDropdown">
+        <button type="button" id="profileBtn">个人资料</button>
+        <button type="button" id="settingsMenuBtn">设置</button>
+        <button type="button" class="danger" id="menuLogoutBtn">退出</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Layout ===== -->
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">
+        <span>分组</span>
+        <button class="add-group-btn" onclick="openGroupModal()" title="新建分组">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+      </div>
+      <div id="groupTree">
+        <div class="group-item active" data-group-id="all" onclick="selectGroup('all')">
+          <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span class="group-name">全部原型</span>
+          <span class="group-count" id="countAll">0</span>
+        </div>
+        <div class="group-item" data-group-id="ungrouped" onclick="selectGroup('ungrouped')">
+          <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span class="group-name">未分组</span>
+          <span class="group-count" id="countUngrouped">0</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="toolbar">
+      <h2 id="mainTitle">全部原型</h2>
+      <div class="actions">
+        <button class="btn btn-primary" id="newProjectBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          新建项目
+        </button>
+      </div>
+    </div>
+
+    <div class="quota-strip" id="quotaStrip">
+      <span id="quotaText">当前配额加载中...</span>
+      <button class="btn btn-sm" onclick="refreshAuthState()">刷新配额</button>
+    </div>
+
+    <div class="proto-list" id="protoList">
+      <div class="loading" id="loadingState">
+        <div class="spinner"></div>
+        <div>加载中...</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== Upload Modal ===== -->
+<div class="modal-overlay" id="uploadModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="uploadModalTitle">新建项目</h3>
+      <button class="close" onclick="closeModal('uploadModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field" id="projectNameField">
+        <label>项目名称</label>
+        <input type="text" id="projectNameInput" placeholder="请输入项目名称">
+      </div>
+      <div class="form-field" id="groupSelectField">
+        <label>所属分组</label>
+        <select id="groupSelect">
+          <option value="">不选择分组</option>
+        </select>
+      </div>
+      <div class="upload-area" id="uploadArea">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="upload-text" id="uploadAreaText">点击选择新的原型文件夹</div>
+        <div class="upload-hint">或拖拽文件夹到此处</div>
+      </div>
+      <div class="upload-info" id="uploadInfo">
+        <b>使用说明：</b><br>
+        1. 点击右上角「Chrome 扩展」，下载并安装 MockLink 扩展<br>
+        2. 打开 Axure 原型页面，使用扩展一键同步上传；后续修改后再次同步，即可实时更新内容
+      </div>
+      <div class="upload-progress" id="uploadProgress" style="display:none;">
+        <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+        <div class="prog-text">
+          <span id="progStatus">准备上传...</span>
+          <span><b id="progDone">0</b> / <span id="progTotal">0</span> 文件</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('uploadModal')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Group Modal ===== -->
+<div class="modal-overlay" id="groupModal">
+  <div class="modal" style="max-width: 440px;">
+    <div class="modal-header">
+      <h3 id="groupModalTitle">新建分组</h3>
+      <button class="close" onclick="closeModal('groupModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="group-form-field">
+        <label>分组名称</label>
+        <input type="text" id="groupNameInput" placeholder="请输入分组名称" maxlength="30">
+      </div>
+      <div class="group-form-field" id="parentGroupField">
+        <label>父分组（留空则创建顶级分组）</label>
+        <select id="parentGroupSelect">
+          <option value="">无（顶级分组）</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('groupModal')">取消</button>
+      <button class="btn btn-primary" id="groupSaveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Confirm Modal ===== -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="max-width: 400px;">
+    <div class="modal-body">
+      <div class="confirm-content">
+        <div class="confirm-icon" id="confirmIcon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </div>
+        <h4 id="confirmTitle">确认操作</h4>
+        <div id="confirmMessage" class="confirm-message">确定要执行此操作吗？</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('confirmModal')">取消</button>
+      <button class="btn btn-danger" id="confirmOkBtn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Share Modal ===== -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-header">
+      <h3>分享原型</h3>
+      <button class="close" onclick="closeModal('shareModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="share-content">
+        <div class="share-label">分享链接（发给任何人都能在线查看）</div>
+        <div class="share-link">
+          <input type="text" id="shareInput" readonly>
+          <button class="btn btn-primary" id="copyShareBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            复制
+          </button>
+        </div>
+        <div class="share-info" id="shareInfo"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('shareModal')">关闭</button>
+      <button class="btn btn-primary" id="openShareBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <polyline points="15 3 21 3 21 9"/>
+          <line x1="10" y1="14" x2="21" y2="3"/>
+        </svg>
+        打开预览
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Auth Modal ===== -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal" style="max-width: 420px;">
+    <div class="modal-header">
+      <h3>登录 / 注册</h3>
+      <button class="close" onclick="closeModal('authModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="group-form-field">
+        <label>邮箱</label>
+        <input type="email" id="authEmail" placeholder="name@example.com">
+      </div>
+      <div class="group-form-field">
+        <label>密码</label>
+        <input type="password" id="authPassword" placeholder="至少 6 位">
+      </div>
+      <div class="group-form-field">
+        <label>昵称（注册时可填）</label>
+        <input type="text" id="authName" placeholder="例如：产品设计师">
+      </div>
+      <div class="upload-info">
+        第一个注册用户自动成为管理员，可在「账户管理」中查看用户和调整配额。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('authModal')">取消</button>
+      <button class="btn" id="registerBtn">注册</button>
+      <button class="btn btn-primary" id="doLoginBtn">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Admin Quota Modal ===== -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal" style="max-width: 840px;">
+    <div class="modal-header">
+      <h3>后台：用户和配额</h3>
+      <button class="close" onclick="closeModal('adminModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="admin-toolbar">
+        <button class="btn btn-primary" onclick="openCreateUser()">新增账号</button>
+      </div>
+      <div id="adminUsers">加载中...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="fileInput" webkitdirectory multiple style="display:none">
+
+<script>
+const API = '';
+let allPrototypes = [];
+let allGroups = [];
+let selectedGroupId = 'all';
+let updatingToken = null;
+let editingGroupId = null;
+let confirmCallback = null;
+let currentUser = null;
+let currentUsage = null;
+let adminUserCache = [];
+
+function authHeaders(extra = {}) {
+  // 管理后台统一使用 HttpOnly Cookie 登录态，避免浏览器残留旧 localStorage token 导致跳转循环。
+  return extra;
+}
+
+function authFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: authHeaders(options.headers || {}),
+  });
+}
+
+async function responseError(res) {
+  try {
+    const data = await res.json();
+    return data.error || `HTTP ${res.status}`;
+  } catch (e) {
+    return `HTTP ${res.status}`;
+  }
+}
+
+// ===== Initialize =====
+document.addEventListener('DOMContentLoaded', async () => {
+  setupEventListeners();
+  const authed = await refreshAuthState();
+  if (!authed) return;
+  await loadGroups();
+  await loadPrototypes();
+});
+
+function setupEventListeners() {
+  // New project button
+  document.getElementById('newProjectBtn').addEventListener('click', () => {
+    updatingToken = null;
+    openUploadModal('新建项目');
+  });
+
+  // File input
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const files = Array.from(e.target.files).filter(f => f.webkitRelativePath);
+    if (files.length) handleFiles(files);
+    e.target.value = '';
+  });
+
+  // Upload area click
+  document.getElementById('uploadArea').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+
+  // Drag and drop
+  const uploadArea = document.getElementById('uploadArea');
+  ['dragenter','dragover'].forEach(ev => {
+    uploadArea.addEventListener(ev, e => { e.preventDefault(); uploadArea.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    uploadArea.addEventListener(ev, e => { e.preventDefault(); uploadArea.classList.remove('drag'); });
+  });
+  uploadArea.addEventListener('drop', e => {
+    const items = e.dataTransfer.items;
+    if (!items) return;
+    const files = [];
+    const traverse = (entry, cb) => {
+      if (entry.isFile) {
+        entry.file(f => { f.webkitRelativePath = entry.fullPath.replace(/^\//,''); files.push(f); cb(); });
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readAll = () => reader.readEntries(entries => {
+          if (!entries.length) { cb(); return; }
+          let pending = entries.length;
+          entries.forEach(en => traverse(en, () => { if (--pending === 0) readAll(); }));
+        });
+        readAll();
+      }
+    };
+    const entries = [];
+    for (const it of items) { const entry = it.webkitGetAsEntry && it.webkitGetAsEntry(); if (entry) entries.push(entry); }
+    if (!entries.length) return;
+    let pending = entries.length;
+    entries.forEach(en => traverse(en, () => { if (--pending === 0 && files.length) handleFiles(files); }));
+  });
+
+  // Search
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    renderPrototypes(filterPrototypes(q));
+  });
+
+  // Extension download
+  document.getElementById('extensionBtn').addEventListener('click', downloadExtension);
+  document.getElementById('loginBtn').addEventListener('click', () => { location.href = '/login.html'; });
+  document.getElementById('userPill').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const dropdown = document.getElementById('userDropdown');
+    const isOpen = dropdown.classList.toggle('show');
+    document.getElementById('userPill').setAttribute('aria-expanded', String(isOpen));
+  });
+  document.getElementById('profileBtn').addEventListener('click', () => {
+    document.getElementById('userDropdown').classList.remove('show');
+    showToast('个人资料功能开发中', 'info');
+  });
+  document.getElementById('settingsMenuBtn').addEventListener('click', () => {
+    document.getElementById('userDropdown').classList.remove('show');
+    showToast('设置功能开发中', 'info');
+  });
+  document.getElementById('menuLogoutBtn').addEventListener('click', logout);
+  document.getElementById('doLoginBtn').addEventListener('click', () => submitAuth('login'));
+  document.getElementById('registerBtn').addEventListener('click', () => submitAuth('register'));
+  document.getElementById('adminBtn').addEventListener('click', () => {
+    openModal('adminModal');
+    loadAdminUsers();
+  });
+
+  // Share modal buttons
+  document.getElementById('copyShareBtn').addEventListener('click', () => {
+    const input = document.getElementById('shareInput');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(() => showToast('链接已复制', 'success'));
+  });
+  document.getElementById('openShareBtn').addEventListener('click', () => {
+    window.open(document.getElementById('shareInput').value, '_blank');
+  });
+
+  // Group modal save
+  document.getElementById('groupSaveBtn').addEventListener('click', saveGroup);
+
+  // Confirm modal
+  document.getElementById('confirmOkBtn').addEventListener('click', async () => {
+    if (!confirmCallback) {
+      closeModal('confirmModal');
+      return;
+    }
+    const callback = confirmCallback;
+    const result = await callback();
+    if (result !== false) {
+      confirmCallback = null;
+      closeModal('confirmModal');
+      document.getElementById('confirmModal').classList.remove('compact-form');
+    }
+  });
+
+  // Close modal on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal(overlay.id);
+    });
+  });
+  document.addEventListener('click', (e) => {
+    const userMenu = document.getElementById('userMenu');
+    if (!userMenu.contains(e.target)) {
+      document.getElementById('userDropdown').classList.remove('show');
+      document.getElementById('userPill').setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.show').forEach(m => closeModal(m.id));
+      document.getElementById('userDropdown').classList.remove('show');
+      document.getElementById('userPill').setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+// ===== Auth & Quota =====
+async function refreshAuthState() {
+  try {
+    const res = await authFetch(`${API}/api/auth/me`, { cache: 'no-store' });
+    const data = await res.json();
+    currentUser = data.user || null;
+    currentUsage = data.usage || null;
+    renderAuthState();
+    return !!currentUser;
+  } catch (e) {
+    currentUser = null;
+    currentUsage = null;
+    document.getElementById('protoList').innerHTML = `
+      <div class="empty-state">
+        <p>登录状态检查失败</p>
+        <p class="hint">${escapeHtml(e.message || '请刷新后重试')}</p>
+      </div>`;
+    return false;
+  }
+}
+
+function renderAuthState() {
+  const loginBtn = document.getElementById('loginBtn');
+  const adminBtn = document.getElementById('adminBtn');
+  const userPill = document.getElementById('userPill');
+  const userMenu = document.getElementById('userMenu');
+  const userDropdown = document.getElementById('userDropdown');
+  const quotaStrip = document.getElementById('quotaStrip');
+  const quotaText = document.getElementById('quotaText');
+
+  if (!currentUser) {
+    localStorage.removeItem('wc_auth_token');
+    location.replace('/login.html');
+    adminBtn.style.display = 'none';
+    userPill.classList.remove('show');
+    userMenu.classList.remove('show');
+    userDropdown.classList.remove('show');
+    quotaStrip.classList.remove('show');
+    return;
+  }
+
+  loginBtn.style.display = 'none';
+  adminBtn.style.display = currentUser.role === 'admin' ? '' : 'none';
+  const displayName = currentUser.name || currentUser.email || '用户';
+  userPill.innerHTML = `
+    <span class="user-avatar"><img src="/logo.png" alt=""></span>
+    <span class="user-name">${escapeHtml(displayName)}</span>
+    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  `;
+  userPill.classList.add('show');
+  userMenu.classList.add('show');
+
+  const quota = currentUser.quota || {};
+  const usage = currentUsage || {};
+  const projectLimit = quota.projectLimit < 0 ? '不限' : quota.projectLimit;
+  const storageLimit = quota.storageLimitBytes < 0 ? '不限' : formatSize(quota.storageLimitBytes);
+  quotaText.innerHTML = `当前账号配额：<b>${usage.projectCount || 0}</b> / <b>${projectLimit}</b> 个项目，空间 <b>${formatSize(usage.storageBytes || 0)}</b> / <b>${storageLimit}</b>`;
+  quotaStrip.classList.add('show');
+}
+
+async function submitAuth(mode) {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const name = document.getElementById('authName').value.trim();
+  if (!email || !password) { showToast('请输入邮箱和密码', 'error'); return; }
+  try {
+    const res = await fetch(`${API}/api/auth/${mode === 'register' ? 'register' : 'login'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, name }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '请求失败');
+    localStorage.setItem('wc_auth_token', data.token);
+    closeModal('authModal');
+    showToast(mode === 'register' ? '注册成功' : '登录成功', 'success');
+    await refreshAuthState();
+    await loadPrototypes();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function logout() {
+  try { await authFetch(`${API}/api/auth/logout`, { method: 'POST' }); } catch (e) {}
+  localStorage.removeItem('wc_auth_token');
+  currentUser = null;
+  currentUsage = null;
+  renderAuthState();
+  await loadPrototypes();
+  showToast('已退出登录', 'success');
+}
+
+async function loadAdminUsers() {
+  const el = document.getElementById('adminUsers');
+  el.innerHTML = '加载中...';
+  try {
+    const res = await authFetch(`${API}/api/admin/users`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '加载失败');
+    if (!data.users || data.users.length === 0) {
+      el.innerHTML = '<div class="empty-state"><p>暂无用户</p></div>';
+      return;
+    }
+    adminUserCache = data.users;
+    el.innerHTML = `
+      <table class="admin-table">
+        <thead>
+          <tr><th>用户</th><th>角色</th><th>项目使用</th><th>空间使用</th><th>项目上限</th><th>空间上限</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          ${data.users.map(u => `
+            <tr data-user-id="${u.id}">
+              <td>${escapeHtml(u.name || u.email)}<br><span class="muted">${escapeHtml(u.email)}</span></td>
+              <td>${u.role === 'admin' ? '管理员' : '用户'}</td>
+              <td>${u.usage.projectCount} / ${u.quota.projectLimit < 0 ? '不限' : u.quota.projectLimit}</td>
+              <td>${formatSize(u.usage.storageBytes)} / ${u.quota.storageLimitBytes < 0 ? '不限' : formatSize(u.quota.storageLimitBytes)}</td>
+              <td>${u.quota.projectLimit < 0 ? '不限' : u.quota.projectLimit}</td>
+              <td>${u.quota.storageLimitBytes < 0 ? '不限' : formatSize(u.quota.storageLimitBytes)}</td>
+              <td>
+                <button class="btn btn-sm btn-primary" onclick="openEditUser('${u.id}')">修改</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteUserAccount('${u.id}')">删除</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state"><p>加载失败：${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function openEditUser(userId) {
+  const user = adminUserCache.find(u => u.id === userId);
+  if (!user) {
+    showToast('用户不存在，请刷新后重试', 'error');
+    return;
+  }
+  const storageLimitMB = user.quota.storageLimitBytes < 0 ? -1 : Math.round(user.quota.storageLimitBytes / 1024 / 1024);
+  showConfirm(
+    'warning',
+    '修改用户信息',
+    `
+      <div class="admin-edit-grid">
+        <div>
+          <label>姓名</label>
+          <input id="editUserName" value="${escapeHtml(user.name || '')}" placeholder="请输入姓名">
+        </div>
+        <div>
+          <label>账号</label>
+          <input id="editUserEmail" value="${escapeHtml(user.email || '')}" placeholder="请输入账号">
+        </div>
+        <div class="field-full">
+          <label>密码（留空表示不修改）</label>
+          <input id="editUserPassword" type="password" placeholder="至少 6 位">
+        </div>
+        <div>
+          <label>项目上限（-1 表示不限）</label>
+          <input id="editProjectLimit" type="number" value="${user.quota.projectLimit}">
+        </div>
+        <div>
+          <label>空间上限 MB（-1 表示不限）</label>
+          <input id="editStorageLimitMB" type="number" value="${storageLimitMB}">
+        </div>
+      </div>
+    `,
+    () => saveUserInfo(userId)
+  );
+  document.getElementById('confirmModal').classList.add('compact-form');
+  document.getElementById('confirmOkBtn').textContent = '保存修改';
+  setTimeout(() => document.getElementById('editUserName')?.focus(), 0);
+}
+
+function openCreateUser() {
+  showConfirm(
+    'warning',
+    '新增账号',
+    `
+      <div class="admin-edit-grid">
+        <div>
+          <label>姓名</label>
+          <input id="editUserName" placeholder="请输入姓名">
+        </div>
+        <div>
+          <label>账号</label>
+          <input id="editUserEmail" placeholder="请输入账号">
+        </div>
+        <div class="field-full">
+          <label>密码</label>
+          <input id="editUserPassword" type="password" placeholder="至少 6 位">
+        </div>
+        <div>
+          <label>项目上限（-1 表示不限）</label>
+          <input id="editProjectLimit" type="number" value="20">
+        </div>
+        <div>
+          <label>空间上限 MB（-1 表示不限）</label>
+          <input id="editStorageLimitMB" type="number" value="100">
+        </div>
+      </div>
+    `,
+    saveNewUser
+  );
+  document.getElementById('confirmModal').classList.add('compact-form');
+  document.getElementById('confirmOkBtn').textContent = '创建账号';
+  setTimeout(() => document.getElementById('editUserName')?.focus(), 0);
+}
+
+function deleteUserAccount(userId) {
+  const user = adminUserCache.find(u => u.id === userId);
+  if (!user) {
+    showToast('用户不存在，请刷新后重试', 'error');
+    return;
+  }
+  showConfirm(
+    'danger',
+    '删除账号',
+    `确定要删除账号「${escapeHtml(user.name || user.email)}」吗？\n\n删除后该账号将无法登录，且操作不可恢复。`,
+    () => doDeleteUser(userId)
+  );
+}
+
+async function doDeleteUser(userId) {
+  try {
+    const res = await authFetch(`${API}/api/admin/users/${userId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '删除失败');
+    showToast('账号已删除', 'success');
+    await loadAdminUsers();
+    await refreshAuthState();
+    return true;
+  } catch (e) {
+    showToast(e.message, 'error');
+    return false;
+  }
+}
+
+async function saveUserInfo(userId) {
+  const name = document.getElementById('editUserName').value.trim();
+  const email = document.getElementById('editUserEmail').value.trim();
+  const password = document.getElementById('editUserPassword').value;
+  const projectLimit = document.getElementById('editProjectLimit').value;
+  const storageLimitMB = document.getElementById('editStorageLimitMB').value;
+  if (!name || !email) {
+    showToast('请输入姓名和账号', 'error');
+    return false;
+  }
+  if (password && password.length < 6) {
+    showToast('密码至少 6 位', 'error');
+    return false;
+  }
+  try {
+    const res = await authFetch(`${API}/api/admin/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, projectLimit, storageLimitMB }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '修改失败');
+    showToast('用户信息已更新', 'success');
+    await loadAdminUsers();
+    await refreshAuthState();
+    return true;
+  } catch (e) {
+    showToast(e.message, 'error');
+    return false;
+  }
+}
+
+async function saveNewUser() {
+  const name = document.getElementById('editUserName').value.trim();
+  const email = document.getElementById('editUserEmail').value.trim();
+  const password = document.getElementById('editUserPassword').value;
+  const projectLimit = document.getElementById('editProjectLimit').value;
+  const storageLimitMB = document.getElementById('editStorageLimitMB').value;
+  if (!name || !email || !password) {
+    showToast('请输入姓名、账号和密码', 'error');
+    return false;
+  }
+  if (password.length < 6) {
+    showToast('密码至少 6 位', 'error');
+    return false;
+  }
+  try {
+    const res = await authFetch(`${API}/api/admin/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, projectLimit, storageLimitMB }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '创建失败');
+    showToast('账号已新增', 'success');
+    await loadAdminUsers();
+    await refreshAuthState();
+    return true;
+  } catch (e) {
+    showToast(e.message, 'error');
+    return false;
+  }
+}
+
+// ===== Groups =====
+async function loadGroups() {
+  try {
+    const res = await authFetch(`${API}/api/groups`);
+    const data = await res.json();
+    allGroups = data.groups || [];
+    renderGroupTree();
+    populateGroupSelects();
+  } catch (e) {
+    console.error('加载分组失败:', e);
+  }
+}
+
+function renderGroupTree() {
+  const tree = document.getElementById('groupTree');
+  const topGroups = allGroups.filter(g => !g.parentId);
+
+  // Count prototypes per group
+  const countByGroup = {};
+  allPrototypes.forEach(p => {
+    if (p.groupId) countByGroup[p.groupId] = (countByGroup[p.groupId] || 0) + 1;
+  });
+  const ungroupedCount = allPrototypes.filter(p => !p.groupId).length;
+
+  let html = `
+    <div class="group-item ${selectedGroupId === 'all' ? 'active' : ''}" data-group-id="all" onclick="selectGroup('all')">
+      <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span class="group-name">全部原型</span>
+      <span class="group-count">${allPrototypes.length}</span>
+    </div>
+    <div class="group-item ${selectedGroupId === 'ungrouped' ? 'active' : ''}" data-group-id="ungrouped" onclick="selectGroup('ungrouped')">
+      <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <span class="group-name">未分组</span>
+      <span class="group-count">${ungroupedCount}</span>
+    </div>`;
+
+  // Render top-level groups with children
+  topGroups.forEach(g => {
+    const children = allGroups.filter(c => c.parentId === g.id);
+    const count = countByGroup[g.id] || 0;
+    const isActive = selectedGroupId === g.id;
+    const hasChildren = children.length > 0;
+
+    html += `
+    <div class="group-item ${isActive ? 'active' : ''}" data-group-id="${g.id}" onclick="selectGroup('${g.id}')">
+      ${hasChildren
+        ? `<span class="group-expand" onclick="event.stopPropagation(); toggleGroupExpand('${g.id}', this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>`
+        : '<span class="group-expand-placeholder"></span>'}
+      <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span class="group-name">${escapeHtml(g.name)}</span>
+      <span class="group-count">${count}</span>
+      <div class="group-actions">
+        <button onclick="event.stopPropagation(); openGroupModal('${g.id}')" title="编辑">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="danger" onclick="event.stopPropagation(); confirmDeleteGroup('${g.id}', '${escapeHtml(g.name)}')" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+
+    if (hasChildren) {
+      html += `<div class="group-children" id="children-${g.id}" style="display:none;">`;
+      children.forEach(c => {
+        const cCount = countByGroup[c.id] || 0;
+        const cActive = selectedGroupId === c.id;
+        html += `
+        <div class="group-item ${cActive ? 'active' : ''}" data-group-id="${c.id}" onclick="selectGroup('${c.id}')">
+          <span class="group-expand-placeholder"></span>
+          <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="group-name">${escapeHtml(c.name)}</span>
+          <span class="group-count">${cCount}</span>
+          <div class="group-actions">
+            <button onclick="event.stopPropagation(); openGroupModal('${c.id}')" title="编辑">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button class="danger" onclick="event.stopPropagation(); confirmDeleteGroup('${c.id}', '${escapeHtml(c.name)}')" title="删除">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  });
+
+  tree.innerHTML = html;
+
+  // Restore expanded state
+  document.querySelectorAll('.group-expand.expanded').forEach(el => {
+    const id = el.closest('.group-item').dataset.groupId;
+    const children = document.getElementById('children-' + id);
+    if (children) children.style.display = 'block';
+  });
+}
+
+function toggleGroupExpand(groupId, el) {
+  const children = document.getElementById('children-' + groupId);
+  if (!children) return;
+  const isExpanded = children.style.display === 'block';
+  children.style.display = isExpanded ? 'none' : 'block';
+  el.classList.toggle('expanded', !isExpanded);
+}
+
+function selectGroup(groupId) {
+  selectedGroupId = groupId;
+  // Update active states
+  document.querySelectorAll('.group-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.groupId === groupId);
+  });
+  // Update title
+  let title = '全部原型';
+  if (groupId === 'ungrouped') title = '未分组';
+  else if (groupId !== 'all') {
+    const g = allGroups.find(g => g.id === groupId);
+    title = g ? g.name : '原型管理';
+  }
+  document.getElementById('mainTitle').textContent = title;
+  // Re-render filtered list
+  renderPrototypes(filterPrototypes());
+}
+
+function filterPrototypes(searchQuery) {
+  let filtered = allPrototypes;
+  if (selectedGroupId === 'ungrouped') {
+    filtered = filtered.filter(p => !p.groupId);
+  } else if (selectedGroupId !== 'all') {
+    filtered = filtered.filter(p => p.groupId === selectedGroupId);
+  }
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.token.toLowerCase().includes(q));
+  }
+  return filtered;
+}
+
+function populateGroupSelects() {
+  // Populate group select in upload modal
+  const select = document.getElementById('groupSelect');
+  const currentVal = select.value;
+  let options = '<option value="">不选择分组</option>';
+  const topGroups = allGroups.filter(g => !g.parentId);
+  topGroups.forEach(g => {
+    options += `<option value="${g.id}">${escapeHtml(g.name)}</option>`;
+    const children = allGroups.filter(c => c.parentId === g.id);
+    children.forEach(c => {
+      options += `<option value="${c.id}">　└ ${escapeHtml(c.name)}</option>`;
+    });
+  });
+  select.innerHTML = options;
+  select.value = currentVal;
+
+  // Populate parent group select in group modal
+  const parentSelect = document.getElementById('parentGroupSelect');
+  let parentOptions = '<option value="">无（顶级分组）</option>';
+  topGroups.forEach(g => {
+    parentOptions += `<option value="${g.id}">${escapeHtml(g.name)}</option>`;
+  });
+  parentSelect.innerHTML = parentOptions;
+}
+
+function openGroupModal(groupId) {
+  editingGroupId = groupId || null;
+  const isEdit = !!groupId;
+  document.getElementById('groupModalTitle').textContent = isEdit ? '编辑分组' : '新建分组';
+  document.getElementById('groupSaveBtn').textContent = isEdit ? '保存' : '创建';
+
+  if (isEdit) {
+    const g = allGroups.find(g => g.id === groupId);
+    if (g) {
+      document.getElementById('groupNameInput').value = g.name;
+      document.getElementById('parentGroupSelect').value = g.parentId || '';
+      // When editing a group that has children, can't change parent
+      const hasChildren = allGroups.some(c => c.parentId === groupId);
+      document.getElementById('parentGroupField').style.display = hasChildren ? 'none' : 'block';
+    }
+  } else {
+    document.getElementById('groupNameInput').value = '';
+    document.getElementById('parentGroupSelect').value = '';
+    document.getElementById('parentGroupField').style.display = 'block';
+  }
+
+  openModal('groupModal');
+  setTimeout(() => document.getElementById('groupNameInput').focus(), 100);
+}
+
+async function saveGroup() {
+  const name = document.getElementById('groupNameInput').value.trim();
+  if (!name) { showToast('分组名称不能为空', 'error'); return; }
+  const parentId = document.getElementById('parentGroupSelect').value || null;
+
+  try {
+    if (editingGroupId) {
+      const res = await authFetch(`${API}/api/groups/${editingGroupId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, parentId })
+      });
+      if (!res.ok) { const d = await res.json(); showToast(d.error || '更新失败', 'error'); return; }
+      showToast('分组已更新', 'success');
+    } else {
+      const res = await authFetch(`${API}/api/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, parentId })
+      });
+      if (!res.ok) { const d = await res.json(); showToast(d.error || '创建失败', 'error'); return; }
+      showToast('分组已创建', 'success');
+    }
+    closeModal('groupModal');
+    await loadGroups();
+  } catch (e) {
+    showToast('操作失败：' + e.message, 'error');
+  }
+}
+
+function confirmDeleteGroup(groupId, name) {
+  showConfirm(
+    'danger',
+    '删除分组',
+    `确定要删除分组「${name}」吗？\n\n子分组将一并删除，分组下的原型将变为未分组。`,
+    () => doDeleteGroup(groupId)
+  );
+}
+
+async function doDeleteGroup(groupId) {
+  try {
+    const res = await authFetch(`${API}/api/groups/${groupId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showToast('分组已删除', 'success');
+    if (selectedGroupId === groupId) selectGroup('all');
+    await loadGroups();
+    await loadPrototypes();
+  } catch (e) {
+    showToast('删除失败：' + e.message, 'error');
+  }
+}
+
+// ===== Load Prototypes =====
+async function loadPrototypes() {
+  try {
+    const res = await authFetch(`${API}/api/prototypes`);
+    const data = await res.json();
+    allPrototypes = data.prototypes || [];
+    renderGroupTree();
+    renderPrototypes(filterPrototypes());
+  } catch (e) {
+    document.getElementById('protoList').innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>加载失败：${e.message}</p>
+        <p class="hint">请确认服务已启动</p>
+      </div>`;
+  }
+}
+
+// ===== Render Prototypes =====
+function renderPrototypes(prototypes) {
+  const el = document.getElementById('protoList');
+  if (!prototypes || prototypes.length === 0) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <p>还没有原型项目</p>
+        <p class="hint">点击「新建项目」上传你的第一个 Axure 原型</p>
+      </div>`;
+    return;
+  }
+
+  let html = `
+    <div class="proto-list-header">
+      <span>项目名称</span>
+      <span>状态</span>
+      <span>大小</span>
+      <span>更新时间</span>
+      <span style="text-align:right;">操作</span>
+    </div>`;
+
+  html += prototypes.map(p => {
+    const statusInfo = getStatusInfo(p.status);
+    const date = formatDate(p.updatedAt || p.createdAt);
+    const canOpen = p.status === 'ready' || p.hasIndex;
+    const rowClass = canOpen ? '' : 'disabled';
+    const groupName = p.groupId ? (allGroups.find(g => g.id === p.groupId)?.name || '') : '';
+    return `
+    <div class="proto-item ${rowClass}" data-token="${p.token}" ${canOpen ? `onclick="openPrototype('${p.token}')"` : ''}>
+      <div class="proto-name">
+        <span class="status-dot ${p.status}"></span>
+        <span class="name-text">${escapeHtml(p.name)}${groupName ? ' <span style="font-size:11px;color:var(--muted);font-weight:400;">· ' + escapeHtml(groupName) + '</span>' : ''}</span>
+      </div>
+      <div class="proto-status">
+        <span class="badge ${p.status}">${statusInfo.label}</span>
+      </div>
+      <div class="proto-size">${p.size || '0 B'}</div>
+      <div class="proto-date">${date}</div>
+      <div class="proto-actions">
+        <button class="act-btn" onclick="event.stopPropagation(); renamePrototype('${p.token}', '${escapeHtml(p.name)}')" title="修改名称">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+          </svg>
+          <span class="tooltip">修改名称</span>
+        </button>
+        <button class="act-btn" onclick="event.stopPropagation(); updatePrototype('${p.token}')" title="更新">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+          </svg>
+          <span class="tooltip">更新</span>
+        </button>
+        <button class="act-btn" onclick="event.stopPropagation(); sharePrototype('${p.token}', '${escapeHtml(p.name)}')" title="分享">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          <span class="tooltip">分享</span>
+        </button>
+        <button class="act-btn" onclick="event.stopPropagation(); movePrototype('${p.token}', '${escapeHtml(p.name)}')" title="移动分组">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="5 9 2 12 5 15"/>
+            <polyline points="9 5 12 2 15 5"/>
+            <polyline points="15 19 12 22 9 19"/>
+            <polyline points="19 9 22 12 19 15"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <line x1="12" y1="2" x2="12" y2="22"/>
+          </svg>
+          <span class="tooltip">移动分组</span>
+        </button>
+        <button class="act-btn" onclick="event.stopPropagation(); clearHtml('${p.token}', '${escapeHtml(p.name)}')" title="清空HTML">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+          <span class="tooltip">清空HTML</span>
+        </button>
+        <button class="act-btn danger" onclick="event.stopPropagation(); deletePrototype('${p.token}', '${escapeHtml(p.name)}')" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          <span class="tooltip">删除</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+}
+
+// ===== Helper Functions =====
+function getStatusInfo(status) {
+  const map = {
+    'ready': { label: '已发布', color: 'var(--accent)' },
+    'cleared': { label: '已清空', color: 'var(--warning)' },
+    'uploading': { label: '上传中', color: '#1890ff' },
+    'updating': { label: '更新中', color: '#1890ff' },
+    'unknown': { label: '未知', color: 'var(--muted)' },
+  };
+  return map[status] || map.unknown;
+}
+
+function formatDate(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+  if (diff < 604800) return Math.floor(diff / 86400) + ' 天前';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day} ${h}:${min}`;
+}
+
+function formatSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+  return `${parseFloat((n / Math.pow(1024, i)).toFixed(1))} ${units[i]}`;
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function showToast(msg, type = 'info') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast show ' + type;
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  modal.classList.remove('show');
+  if (id === 'confirmModal') {
+    modal.classList.remove('compact-form');
+    confirmCallback = null;
+  }
+}
+
+function openUploadModal(title) {
+  const isUpdate = !!updatingToken;
+  document.getElementById('uploadModalTitle').textContent = title;
+  document.getElementById('uploadAreaText').textContent = '点击选择新的原型文件夹';
+  document.getElementById('uploadProgress').style.display = 'none';
+  document.getElementById('progFill').style.width = '0%';
+  document.getElementById('projectNameField').style.display = isUpdate ? 'none' : 'block';
+  document.getElementById('groupSelectField').style.display = isUpdate ? 'none' : 'block';
+  document.getElementById('uploadArea').style.display = isUpdate ? 'block' : 'none';
+  document.getElementById('uploadInfo').innerHTML = isUpdate
+    ? '<b>使用说明：</b><br>1. 选择新的 Axure 原型文件夹，系统会保持原分享链接不变<br>2. 上传完成后自动更新线上内容<br>3. 推荐优先使用 Chrome 扩展进行一键同步'
+    : '<b>使用说明：</b><br>1. 点击右上角「Chrome 扩展」，下载并安装 MockLink 扩展<br>2. 打开 Axure 原型页面，使用扩展一键同步上传；后续修改后再次同步，即可实时更新内容';
+  if (!isUpdate) {
+    document.getElementById('projectNameInput').value = '';
+  }
+  openModal('uploadModal');
+}
+
+// ===== Extension Download =====
+function downloadExtension() {
+  const a = document.createElement('a');
+  a.href = '/extension.zip';
+  a.download = 'mocklink-extension.zip';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => showToast('扩展下载已开始', 'success'), 500);
+}
+
+// ===== Prototype Actions =====
+function openPrototype(token) {
+  window.open(`${location.origin}/v/${token}/`, '_blank');
+}
+
+function updatePrototype(token) {
+  updatingToken = token;
+  openUploadModal('更新原型');
+}
+
+function renamePrototype(token, name) {
+  showConfirm(
+    'warning',
+    '修改项目名称',
+    `请输入新的项目名称：\n\n<input id="renameProjectInput" value="${escapeHtml(name)}" style="width:100%;height:36px;padding:0 8px;border:1px solid var(--rule);border-radius:6px;font-size:13px;margin-top:8px;">`,
+    async () => {
+      const input = document.getElementById('renameProjectInput');
+      const newName = input ? input.value.trim() : '';
+      if (!newName) {
+        showToast('请输入项目名称', 'error');
+        return;
+      }
+      try {
+        const res = await authFetch(`${API}/api/prototypes/${token}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName })
+        });
+        if (!res.ok) throw new Error(await responseError(res));
+        showToast('项目名称已修改', 'success');
+        loadPrototypes();
+      } catch (e) {
+        showToast('修改失败：' + e.message, 'error');
+      }
+    }
+  );
+  document.getElementById('confirmOkBtn').textContent = '保存名称';
+  setTimeout(() => document.getElementById('renameProjectInput')?.focus(), 0);
+}
+
+function movePrototype(token, name) {
+  // Build a quick move modal using the group select
+  const options = allGroups.filter(g => !g.parentId).map(g => {
+    let opts = `<option value="${g.id}">${escapeHtml(g.name)}</option>`;
+    allGroups.filter(c => c.parentId === g.id).forEach(c => {
+      opts += `<option value="${c.id}">　└ ${escapeHtml(c.name)}</option>`;
+    });
+    return opts;
+  }).join('');
+
+  showConfirm(
+    'warning',
+    '移动分组',
+    `选择「${name}」的目标分组：\n\n<select id="moveGroupSelect" style="width:100%;height:36px;padding:0 8px;border:1px solid var(--rule);border-radius:6px;font-size:13px;margin-top:8px;"><option value="">未分组</option>${options}</select>`,
+    async () => {
+      const sel = document.getElementById('moveGroupSelect');
+      if (!sel) return;
+      const groupId = sel.value || null;
+      try {
+        const res = await authFetch(`${API}/api/prototypes/${token}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupId })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        showToast(groupId ? '已移动到分组' : '已设为未分组', 'success');
+        loadPrototypes();
+      } catch (e) {
+        showToast('移动失败：' + e.message, 'error');
+      }
+    }
+  );
+  // Change button text
+  document.getElementById('confirmOkBtn').textContent = '确认移动';
+}
+
+function sharePrototype(token, name) {
+  const shareUrl = `${location.origin}/s/${token}`;
+  document.getElementById('shareInput').value = shareUrl;
+  document.getElementById('shareInfo').textContent = `项目：${name} · 链接永久有效`;
+  openModal('shareModal');
+}
+
+function clearHtml(token, name) {
+  showConfirm(
+    'warning',
+    '清空 HTML',
+    `确定要清空「${name}」的 HTML 文件吗？\n\n清空后原型将无法访问，但项目记录会保留。之后可以通过「更新」重新上传。`,
+    () => doClearHtml(token)
+  );
+}
+
+function deletePrototype(token, name) {
+  showConfirm(
+    'danger',
+    '删除项目',
+    `确定要删除「${name}」吗？\n\n删除后无法恢复，分享链接将永久失效。`,
+    () => doDelete(token)
+  );
+}
+
+function showConfirm(type, title, message, callback) {
+  document.getElementById('confirmModal').classList.remove('compact-form');
+  const iconEl = document.getElementById('confirmIcon');
+  iconEl.className = 'confirm-icon ' + type;
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').innerHTML = String(message).replace(/>\s+</g, '><').trim();
+  const okBtn = document.getElementById('confirmOkBtn');
+  okBtn.textContent = type === 'danger' ? '确认删除' : '确认';
+  confirmCallback = callback;
+  openModal('confirmModal');
+}
+
+async function doClearHtml(token) {
+  try {
+    const res = await authFetch(`${API}/api/prototypes/${token}/clear`, { method: 'POST' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showToast('已清空 HTML', 'success');
+    loadPrototypes();
+  } catch (e) {
+    showToast('清空失败：' + e.message, 'error');
+  }
+}
+
+async function doDelete(token) {
+  try {
+    const res = await authFetch(`${API}/api/prototypes/${token}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showToast('已删除项目', 'success');
+    loadPrototypes();
+  } catch (e) {
+    showToast('删除失败：' + e.message, 'error');
+  }
+}
+
+// ===== File Upload =====
+async function pMap(items, fn, concurrency = 5) {
+  let i = 0;
+  const workers = Array(Math.min(concurrency, items.length)).fill(0).map(async () => {
+    while (i < items.length) { const idx = i++; await fn(items[idx], idx); }
+  });
+  await Promise.all(workers);
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += 8192) {
+    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
+  }
+  return btoa(chunks.join(''));
+}
+
+async function postJSONWithRetry(url, body, retries = 3) {
+  let lastError = '';
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await authFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return;
+      lastError = await responseError(res);
+      if (res.status === 403) throw new Error(lastError);
+    } catch (e) {
+      lastError = e.message || '网络错误';
+      if (String(lastError).includes('配额')) throw e;
+    }
+    if (attempt < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+  throw new Error(lastError || '上传接口错误');
+}
+
+async function uploadFileObjectsInBatches({ fileObjs, token, onProgress }) {
+  const maxBatchBytes = 1.5 * 1024 * 1024;
+  const maxBatchFiles = 40;
+  let done = 0;
+  let failed = 0;
+  const failedPaths = [];
+  const fetchedFiles = [];
+  const batches = [];
+  let current = [];
+  let currentBytes = 0;
+
+  function flushBatch() {
+    if (!current.length) return;
+    batches.push(current);
+    current = [];
+    currentBytes = 0;
+  }
+
+  await pMap(fileObjs, async ({ file, path }, index) => {
+    try {
+      const buf = await file.arrayBuffer();
+      const item = {
+        path,
+        content: arrayBufferToBase64(buf),
+        size: buf.byteLength,
+        order: index,
+      };
+      fetchedFiles.push(item);
+    } catch (e) {
+      failed++;
+      failedPaths.push(`${path}（${e.message || '读取失败'}）`);
+    }
+  }, 6);
+
+  fetchedFiles.sort((a, b) => a.order - b.order);
+  for (const item of fetchedFiles) {
+    if (item.size > maxBatchBytes) {
+      flushBatch();
+      batches.push([item]);
+    } else {
+      if (current.length >= maxBatchFiles || currentBytes + item.size > maxBatchBytes) flushBatch();
+      current.push(item);
+      currentBytes += item.size;
+    }
+  }
+  flushBatch();
+
+  for (const batch of batches) {
+    try {
+      if (batch.length === 1 && batch[0].size > maxBatchBytes) {
+        await postJSONWithRetry(`${API}/api/prototypes/${token}/files`, {
+          path: batch[0].path,
+          content: batch[0].content,
+        });
+      } else {
+        await postJSONWithRetry(`${API}/api/prototypes/${token}/files/batch`, {
+          files: batch.map(({ path, content }) => ({ path, content })),
+        });
+      }
+      done += batch.length;
+    } catch (e) {
+      failed += batch.length;
+      batch.forEach(item => failedPaths.push(`${item.path}（${e.message || '上传失败'}）`));
+      done += batch.length;
+    }
+    onProgress(done, fileObjs.length, failed);
+  }
+
+  return { failed, failedPaths };
+}
+
+async function handleFiles(files) {
+  const stripTop = (p) => p.split('/').slice(1).join('/') || p;
+  const fileObjs = files.map(f => ({ file: f, path: stripTop(f.webkitRelativePath) })).filter(o => o.path);
+  if (!fileObjs.length) { showToast('未读取到有效文件', 'error'); return; }
+
+  const isUpdate = !!updatingToken;
+  const projectName = document.getElementById('projectNameInput').value.trim();
+  if (!isUpdate && !projectName) {
+    showToast('请输入项目名称', 'error');
+    document.getElementById('projectNameInput').focus();
+    return;
+  }
+  const selectedGroup = document.getElementById('groupSelect').value || null;
+
+  const progEl = document.getElementById('uploadProgress');
+  const progFill = document.getElementById('progFill');
+  const progStatus = document.getElementById('progStatus');
+  const progDone = document.getElementById('progDone');
+  const progTotal = document.getElementById('progTotal');
+  const uploadArea = document.getElementById('uploadArea');
+
+  progEl.style.display = 'block';
+  uploadArea.style.opacity = '0.5';
+  uploadArea.style.pointerEvents = 'none';
+  progFill.style.width = '0%';
+  progDone.textContent = '0';
+  progTotal.textContent = fileObjs.length;
+  progStatus.textContent = isUpdate ? '清空旧文件...' : '创建原型...';
+
+  let token;
+  if (isUpdate) {
+    try {
+      const res = await authFetch(`${API}/api/prototypes/${updatingToken}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error(await responseError(res));
+      token = updatingToken;
+    } catch (e) {
+      showToast('更新失败：' + e.message, 'error');
+      resetUploadArea();
+      return;
+    }
+  } else {
+    try {
+      const res = await authFetch(`${API}/api/prototypes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: projectName, groupId: selectedGroup })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '创建失败');
+      token = data.token;
+    } catch (e) {
+      showToast('创建失败：' + e.message, 'error');
+      resetUploadArea();
+      return;
+    }
+  }
+
+  progStatus.textContent = '上传文件中...';
+  const { failed, failedPaths } = await uploadFileObjectsInBatches({
+    fileObjs,
+    token,
+    onProgress(done, total, failedCount) {
+      progDone.textContent = done;
+      progFill.style.width = (done / total * 100) + '%';
+      progStatus.textContent = failedCount > 0 ? `上传文件中...（${failedCount} 个失败）` : '上传文件中...';
+    },
+  });
+
+  if (failed > 0) {
+    const sample = failedPaths.slice(0, 5).join('；');
+    showToast(`有 ${failed} 个资源未上传，已停止发布。请重新上传。失败示例：${sample}`, 'error');
+    resetUploadArea();
+    return;
+  }
+
+  progStatus.textContent = '发布中...';
+  try {
+    const res = await authFetch(`${API}/api/prototypes/${token}/publish`, { method: 'POST' });
+    if (!res.ok) throw new Error(await responseError(res));
+    const data = await res.json();
+  } catch (e) {
+    showToast('发布失败：' + e.message, 'error');
+    resetUploadArea();
+    return;
+  }
+
+  // Success
+  progStatus.textContent = isUpdate ? '更新完成！' : '上传完成！';
+  showToast(isUpdate ? '原型更新成功' : '原型上传成功', 'success');
+
+  setTimeout(() => {
+    closeModal('uploadModal');
+    resetUploadArea();
+    loadPrototypes();
+    updatingToken = null;
+    // Show share link for new uploads
+    if (!isUpdate) {
+      setTimeout(() => sharePrototype(token, projectName), 300);
+    }
+  }, 800);
+}
+
+function resetUploadArea() {
+  const uploadArea = document.getElementById('uploadArea');
+  uploadArea.style.opacity = '';
+  uploadArea.style.pointerEvents = '';
+  document.getElementById('uploadProgress').style.display = 'none';
+  updatingToken = null;
+}
+</script>
+</body>
+</html>

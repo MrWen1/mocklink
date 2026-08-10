@@ -78,7 +78,6 @@ authBtn.addEventListener('click', async () => {
   }
   await chrome.runtime.sendMessage({ type: 'START_AUTH' });
   hintEl.textContent = '请在打开的页面完成登录；成功后会自动关闭登录页并回到原页面。';
-  authBtn.textContent = '刷新授权';
 });
 
 revokeAuthBtn.addEventListener('click', async () => {
@@ -139,12 +138,13 @@ function renderAuthState(message = '') {
   if (currentUser) {
     authCard.classList.add('authed');
     authUserEl.textContent = currentUser.name || currentUser.email || '已授权账号';
-    authBtn.textContent = '刷新授权';
+    authBtn.style.display = 'none';
     revokeAuthBtn.style.display = '';
     if (message) hintEl.textContent = message;
   } else {
     authCard.classList.remove('authed');
     authUserEl.textContent = '未授权';
+    authBtn.style.display = '';
     authBtn.textContent = '授权登录';
     revokeAuthBtn.style.display = 'none';
     hintEl.textContent = message || '请先授权登录 MockLink 账号，项目会同步到该账号下。';

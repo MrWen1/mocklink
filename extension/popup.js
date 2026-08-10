@@ -76,8 +76,8 @@ authBtn.addEventListener('click', async () => {
     await loadProjects();
     return;
   }
-  chrome.tabs.create({ url: `${DEFAULT_SERVER}/login.html?from=extension` });
-  hintEl.textContent = '请在打开的页面完成登录，登录后回到扩展点击「刷新授权」。';
+  await chrome.runtime.sendMessage({ type: 'START_AUTH' });
+  hintEl.textContent = '请在打开的页面完成登录；成功后会自动关闭登录页并回到原页面。';
   authBtn.textContent = '刷新授权';
 });
 

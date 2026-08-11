@@ -1363,6 +1363,10 @@ let confirmCallback = null;
 let currentUser = null;
 let currentUsage = null;
 let adminUserCache = [];
+const pendingCreatedPrototypes = new Map();
+const pendingDeletedPrototypeTokens = new Set();
+const pendingCreatedGroups = new Map();
+const pendingDeletedGroupIds = new Set();
 
 function authHeaders(extra = {}) {
   // 管理后台统一使用 HttpOnly Cookie 登录态，避免浏览器残留旧 localStorage token 导致跳转循环。
@@ -1860,7 +1864,11 @@ async function loadGroups() {
   try {
     const res = await authFetch(`${API}/api/groups`);
     const data = await res.json();
-    allGroups = data.groups || [];
+    const loadedGroups = (data.groups || []).filter(g => !pendingDeletedGroupIds.has(g.id));
+    pendingCreatedGroups.forEach(group => {
+      if (!loadedGroups.some(g => g.id === group.id)) loadedGroups.push(group);
+    });
+    allGroups = loadedGroups;
     renderGroupTree();
     populateGroupSelects();
   } catch (e) {
@@ -2014,6 +2022,22 @@ function filterPrototypes(searchQuery) {
   return filtered;
 }
 
+function getGroupTitle(groupId) {
+  if (groupId === 'ungrouped') return '未分组';
+  if (groupId && groupId !== 'all') {
+    const g = allGroups.find(g => g.id === groupId);
+    return g ? g.name : '原型管理';
+  }
+  return '全部原型';
+}
+
+function renderWorkspaceState() {
+  document.getElementById('mainTitle').textContent = getGroupTitle(selectedGroupId);
+  renderGroupTree();
+  populateGroupSelects();
+  renderPrototypes(filterPrototypes());
+}
+
 function populateGroupSelects() {
   // Populate group select in upload modal
   const select = document.getElementById('groupSelect');
@@ -2079,6 +2103,8 @@ async function saveGroup() {
         body: JSON.stringify({ name, parentId })
       });
       if (!res.ok) { const d = await res.json(); showToast(d.error || '更新失败', 'error'); return; }
+      const savedGroup = await res.json();
+      allGroups = allGroups.map(g => g.id === editingGroupId ? { ...g, ...savedGroup } : g);
       showToast('分组已更新', 'success');
     } else {
       const res = await authFetch(`${API}/api/groups`, {
@@ -2087,10 +2113,17 @@ async function saveGroup() {
         body: JSON.stringify({ name, parentId })
       });
       if (!res.ok) { const d = await res.json(); showToast(d.error || '创建失败', 'error'); return; }
+      const savedGroup = await res.json();
+      if (savedGroup && savedGroup.id) {
+        pendingCreatedGroups.set(savedGroup.id, savedGroup);
+        allGroups = allGroups.some(g => g.id === savedGroup.id) ? allGroups : [...allGroups, savedGroup];
+        setTimeout(() => pendingCreatedGroups.delete(savedGroup.id), 10000);
+      }
       showToast('分组已创建', 'success');
     }
     closeModal('groupModal');
-    await loadGroups();
+    renderWorkspaceState();
+    setTimeout(() => loadGroups(), 600);
   } catch (e) {
     showToast('操作失败：' + e.message, 'error');
   } finally {
@@ -2112,10 +2145,15 @@ async function doDeleteGroup(groupId) {
   try {
     const res = await authFetch(`${API}/api/groups/${groupId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
+    const removedIds = new Set([groupId, ...allGroups.filter(g => g.parentId === groupId).map(g => g.id)]);
+    removedIds.forEach(id => pendingDeletedGroupIds.add(id));
+    allGroups = allGroups.filter(g => !removedIds.has(g.id));
+    allPrototypes = allPrototypes.map(p => removedIds.has(p.groupId) ? { ...p, groupId: null } : p);
+    if (removedIds.has(selectedGroupId)) selectedGroupId = 'all';
+    renderWorkspaceState();
+    setTimeout(() => removedIds.forEach(id => pendingDeletedGroupIds.delete(id)), 10000);
+    setTimeout(() => { loadGroups(); loadPrototypes(); }, 600);
     showToast('分组已删除', 'success');
-    if (selectedGroupId === groupId) selectGroup('all');
-    await loadGroups();
-    await loadPrototypes();
   } catch (e) {
     showToast('删除失败：' + e.message, 'error');
   }
@@ -2126,7 +2164,11 @@ async function loadPrototypes() {
   try {
     const res = await authFetch(`${API}/api/prototypes`);
     const data = await res.json();
-    allPrototypes = data.prototypes || [];
+    const loadedPrototypes = (data.prototypes || []).filter(p => !pendingDeletedPrototypeTokens.has(p.token));
+    pendingCreatedPrototypes.forEach(project => {
+      if (!loadedPrototypes.some(p => p.token === project.token)) loadedPrototypes.unshift(project);
+    });
+    allPrototypes = loadedPrototypes;
     renderGroupTree();
     renderPrototypes(filterPrototypes());
   } catch (e) {
@@ -2368,9 +2410,31 @@ async function createEmptyProject() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '创建失败');
 
+    const now = new Date().toISOString();
+    const newProject = {
+      token: data.token,
+      name: projectName,
+      status: 'empty',
+      createdAt: now,
+      updatedAt: now,
+      fileCount: 0,
+      size: '0 B',
+      sizeBytes: 0,
+      hasIndex: false,
+      groupId: selectedGroup,
+      ownerId: currentUser ? currentUser.id : null,
+      ownerName: currentUser ? (currentUser.name || currentUser.email) : '未归属',
+    };
+    if (data.token) {
+      pendingCreatedPrototypes.set(data.token, newProject);
+      allPrototypes = allPrototypes.some(p => p.token === data.token) ? allPrototypes : [newProject, ...allPrototypes];
+      renderWorkspaceState();
+      setTimeout(() => pendingCreatedPrototypes.delete(data.token), 10000);
+    }
+
     showToast('空项目已保存', 'success');
     closeModal('uploadModal');
-    await loadPrototypes();
+    setTimeout(() => loadPrototypes(), 600);
   } catch (e) {
     showToast('创建失败：' + e.message, 'error');
   } finally {
@@ -2507,8 +2571,13 @@ async function doDelete(token) {
   try {
     const res = await authFetch(`${API}/api/prototypes/${token}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
+    pendingDeletedPrototypeTokens.add(token);
+    pendingCreatedPrototypes.delete(token);
+    allPrototypes = allPrototypes.filter(p => p.token !== token);
+    renderWorkspaceState();
+    setTimeout(() => pendingDeletedPrototypeTokens.delete(token), 10000);
+    setTimeout(() => loadPrototypes(), 600);
     showToast('已删除项目', 'success');
-    await loadPrototypes();
   } catch (e) {
     showToast('删除失败：' + e.message, 'error');
   }

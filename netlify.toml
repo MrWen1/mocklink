@@ -1,5 +1,5 @@
 [build]
-  command = "echo 'build skipped'"
+  command = "npm run build"
   publish = "server/public"
 
 [build.environment]
@@ -7,7 +7,7 @@
 
 [functions]
   directory = "netlify/functions"
-  node_bundler = "zisi"
+  node_bundler = "esbuild"
 
 [[redirects]]
   from = "/api/*"

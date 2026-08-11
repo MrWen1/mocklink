@@ -1371,6 +1371,7 @@ function authHeaders(extra = {}) {
 
 function authFetch(url, options = {}) {
   return fetch(url, {
+    cache: 'no-cache',
     ...options,
     headers: authHeaders(options.headers || {}),
   });

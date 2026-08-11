@@ -451,7 +451,7 @@ function updateProjectHint() {
 }
 
 function updateSyncButtonText() {
-  const label = selectedProject.mode === 'existing' ? '更新到选中项目' : '新建项目并同步';
+  const label = selectedProject.mode === 'existing' ? '更新到选中项目' : '一键更新同步';
   syncLabel.textContent = label;
 }
 

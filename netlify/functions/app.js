@@ -329,8 +329,8 @@ async function writeMeta(token, meta, addToIndex = false) {
   if (addToIndex) await addPrototypeToken(token);
 }
 
-async function readFileIndex(token) {
-  const data = await readJSON(filesIndexKey(token), [], 'eventual');
+async function readFileIndex(token, consistency = 'eventual') {
+  const data = await readJSON(filesIndexKey(token), [], consistency);
   return Array.isArray(data) ? data : (data.files || []);
 }
 
@@ -343,7 +343,7 @@ async function putPrototypeFile(token, relPath, buffer) {
   await store.set(key, buffer, {
     contentType: getMime(relPath),
   });
-  const files = await readFileIndex(token);
+  const files = await readFileIndex(token, 'strong');
   const existing = files.find(item => item.path === relPath);
   const item = {
     path: relPath,
@@ -360,7 +360,7 @@ async function putPrototypeFile(token, relPath, buffer) {
 
 async function putPrototypeFilesBatch(token, items) {
   const now = new Date().toISOString();
-  const files = await readFileIndex(token);
+  const files = await readFileIndex(token, 'strong');
   const byPath = new Map(files.map(file => [file.path, file]));
   const normalized = items.map(item => {
     const relPath = sanitizePath(item.path);
@@ -397,13 +397,13 @@ async function getPrototypeFile(token, relPath) {
 }
 
 async function deletePrototypeFiles(token) {
-  const files = await readFileIndex(token);
+  const files = await readFileIndex(token, 'strong');
   await Promise.all(files.map(file => store.delete(file.key).catch(() => {})));
   await writeFileIndex(token, []);
 }
 
 async function deletePrototype(token) {
-  const files = await readFileIndex(token);
+  const files = await readFileIndex(token, 'strong');
   await Promise.all([
     ...files.map(file => store.delete(file.key).catch(() => {})),
     store.delete(metaKey(token)).catch(() => {}),
@@ -1210,7 +1210,7 @@ async function handleAPI(request, pathname) {
       const body = await parseJSONBody(request);
       const paths = Array.isArray(body.paths) ? body.paths.map(sanitizePath).filter(Boolean) : [];
       if (!paths.length) return jsonResponse({ error: '缺少要删除的文件路径' }, 400);
-      const files = await readFileIndex(token);
+      const files = await readFileIndex(token, 'strong');
       const toDelete = new Set(paths);
       const remaining = files.filter(f => !toDelete.has(f.path));
       const deleted = files.filter(f => toDelete.has(f.path));
@@ -1261,7 +1261,7 @@ async function handleAPI(request, pathname) {
       if (!meta) return jsonResponse({ error: '原型不存在' }, 404);
       let body = {};
       try { body = await parseJSONBody(request); } catch (e) {}
-      const files = await readFileIndex(token);
+      const files = await readFileIndex(token, 'strong');
       const missingFiles = await validatePrototypeReferences(token, files);
       if (missingFiles.length > 0) {
         const sample = missingFiles.slice(0, 5).join('；');

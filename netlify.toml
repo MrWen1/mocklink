@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "echo 'build skipped'"
   publish = "server/public"
 
 [build.environment]

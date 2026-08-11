@@ -699,6 +699,44 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ===== Action Loading Overlay ===== */
+  .action-loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.5);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(1px);
+  }
+  .action-loading-overlay.show { display: flex; }
+  .action-loading-overlay .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--rule);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  .btn-loading {
+    pointer-events: none;
+    opacity: 0.7;
+    position: relative;
+  }
+  .btn-loading::after {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-left: 6px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: -2px;
+  }
+
   /* ===== Modal ===== */
   .modal-overlay {
     display: none;
@@ -1309,6 +1347,7 @@
 
 <!-- ===== Toast ===== -->
 <div class="toast" id="toast"></div>
+<div class="action-loading-overlay" id="actionLoadingOverlay"><div class="spinner"></div></div>
 
 <!-- Hidden file inputs -->
 <input type="file" id="fileInput" webkitdirectory multiple style="display:none">
@@ -1464,11 +1503,19 @@ function setupEventListeners() {
       return;
     }
     const callback = confirmCallback;
-    const result = await callback();
-    if (result !== false) {
-      confirmCallback = null;
-      closeModal('confirmModal');
-      document.getElementById('confirmModal').classList.remove('compact-form');
+    const okBtn = document.getElementById('confirmOkBtn');
+    setBtnLoading(okBtn, '处理中');
+    showActionLoading();
+    try {
+      const result = await callback();
+      if (result !== false) {
+        confirmCallback = null;
+        closeModal('confirmModal');
+        document.getElementById('confirmModal').classList.remove('compact-form');
+      }
+    } finally {
+      resetBtnLoading(okBtn);
+      hideActionLoading();
     }
   });
 
@@ -1563,6 +1610,9 @@ async function submitAuth(mode) {
   const password = document.getElementById('authPassword').value;
   const name = document.getElementById('authName').value.trim();
   if (!email || !password) { showToast('请输入邮箱和密码', 'error'); return; }
+  const authBtn = mode === 'register' ? document.getElementById('registerBtn') : document.getElementById('doLoginBtn');
+  setBtnLoading(authBtn, mode === 'register' ? '注册中' : '登录中');
+  showActionLoading();
   try {
     const res = await fetch(`${API}/api/auth/${mode === 'register' ? 'register' : 'login'}`, {
       method: 'POST',
@@ -1578,10 +1628,14 @@ async function submitAuth(mode) {
     await loadPrototypes();
   } catch (e) {
     showToast(e.message, 'error');
+  } finally {
+    resetBtnLoading(authBtn);
+    hideActionLoading();
   }
 }
 
 async function logout() {
+  showActionLoading();
   try { await authFetch(`${API}/api/auth/logout`, { method: 'POST' }); } catch (e) {}
   localStorage.removeItem('wc_auth_token');
   currentUser = null;
@@ -1589,6 +1643,7 @@ async function logout() {
   renderAuthState();
   await loadPrototypes();
   showToast('已退出登录', 'success');
+  hideActionLoading();
 }
 
 async function loadAdminUsers() {
@@ -2012,7 +2067,9 @@ async function saveGroup() {
   const name = document.getElementById('groupNameInput').value.trim();
   if (!name) { showToast('分组名称不能为空', 'error'); return; }
   const parentId = document.getElementById('parentGroupSelect').value || null;
-
+  const saveBtn = document.getElementById('groupSaveBtn');
+  setBtnLoading(saveBtn, '保存中');
+  showActionLoading();
   try {
     if (editingGroupId) {
       const res = await authFetch(`${API}/api/groups/${editingGroupId}`, {
@@ -2035,6 +2092,9 @@ async function saveGroup() {
     await loadGroups();
   } catch (e) {
     showToast('操作失败：' + e.message, 'error');
+  } finally {
+    resetBtnLoading(saveBtn);
+    hideActionLoading();
   }
 }
 
@@ -2171,20 +2231,7 @@ function renderPrototypes(prototypes) {
 }
 
 function goBackFromEmpty() {
-  if (selectedGroupId && selectedGroupId !== 'all') {
-    const currentGroup = allGroups.find(g => g.id === selectedGroupId);
-    if (currentGroup && currentGroup.parentId) {
-      selectGroup(currentGroup.parentId);
-      return;
-    }
-    selectGroup('all');
-    return;
-  }
-  if (document.referrer && document.referrer !== location.href) {
-    history.back();
-    return;
-  }
-  location.href = '/';
+  selectGroup('all');
 }
 
 // ===== Helper Functions =====
@@ -2234,6 +2281,27 @@ function showToast(msg, type = 'info') {
   toast.textContent = msg;
   toast.className = 'toast show ' + type;
   setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ===== Action Loading Helpers =====
+function showActionLoading() {
+  document.getElementById('actionLoadingOverlay').classList.add('show');
+}
+function hideActionLoading() {
+  document.getElementById('actionLoadingOverlay').classList.remove('show');
+}
+function setBtnLoading(btn, loadingText) {
+  if (!btn) return;
+  btn._origText = btn.textContent;
+  btn.textContent = loadingText || '处理中';
+  btn.classList.add('btn-loading');
+  btn.disabled = true;
+}
+function resetBtnLoading(btn) {
+  if (!btn) return;
+  if (btn._origText) btn.textContent = btn._origText;
+  btn.classList.remove('btn-loading');
+  btn.disabled = false;
 }
 
 function openModal(id) { document.getElementById(id).classList.add('show'); }
@@ -2287,8 +2355,8 @@ async function createEmptyProject() {
 
   const selectedGroup = document.getElementById('groupSelect').value || null;
   const submitBtn = document.getElementById('uploadSubmitBtn');
-  submitBtn.disabled = true;
-  submitBtn.textContent = '保存中...';
+  setBtnLoading(submitBtn, '保存中');
+  showActionLoading();
 
   try {
     const res = await authFetch(`${API}/api/prototypes`, {
@@ -2301,12 +2369,12 @@ async function createEmptyProject() {
 
     showToast('空项目已保存', 'success');
     closeModal('uploadModal');
-    loadPrototypes();
+    await loadPrototypes();
   } catch (e) {
     showToast('创建失败：' + e.message, 'error');
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = '提交';
+    resetBtnLoading(submitBtn);
+    hideActionLoading();
   }
 }
 
@@ -2340,7 +2408,7 @@ function renamePrototype(token, name) {
         });
         if (!res.ok) throw new Error(await responseError(res));
         showToast('项目名称已修改', 'success');
-        loadPrototypes();
+        await loadPrototypes();
       } catch (e) {
         showToast('修改失败：' + e.message, 'error');
       }
@@ -2376,7 +2444,7 @@ function movePrototype(token, name) {
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         showToast(groupId ? '已移动到分组' : '已设为未分组', 'success');
-        loadPrototypes();
+        await loadPrototypes();
       } catch (e) {
         showToast('移动失败：' + e.message, 'error');
       }
@@ -2428,7 +2496,7 @@ async function doClearHtml(token) {
     const res = await authFetch(`${API}/api/prototypes/${token}/clear`, { method: 'POST' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     showToast('已清空 HTML', 'success');
-    loadPrototypes();
+    await loadPrototypes();
   } catch (e) {
     showToast('清空失败：' + e.message, 'error');
   }
@@ -2439,7 +2507,7 @@ async function doDelete(token) {
     const res = await authFetch(`${API}/api/prototypes/${token}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     showToast('已删除项目', 'success');
-    loadPrototypes();
+    await loadPrototypes();
   } catch (e) {
     showToast('删除失败：' + e.message, 'error');
   }

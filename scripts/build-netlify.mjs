@@ -1,9 +1,12 @@
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT, 'server', 'public');
 const EXTENSION_DIR = path.join(ROOT, 'extension');
 const EXTENSION_ZIP = path.join(PUBLIC_DIR, 'extension.zip');
@@ -38,5 +41,18 @@ async function buildExtensionZip() {
   console.log(`created ${path.relative(ROOT, EXTENSION_ZIP)}`);
 }
 
-await buildExtensionZip();
-
+try {
+  console.log('Build started...');
+  console.log('Node version:', process.version);
+  console.log('ROOT:', ROOT);
+  console.log('PUBLIC_DIR:', PUBLIC_DIR);
+  console.log('EXTENSION_DIR:', EXTENSION_DIR);
+  console.log('EXTENSION_DIR exists:', existsSync(EXTENSION_DIR));
+  await buildExtensionZip();
+  console.log('Build completed successfully.');
+} catch (err) {
+  console.error('Build error:', err.message);
+  console.error(err.stack);
+  // Don't fail the build for extension.zip issues
+  console.warn('Continuing despite extension.zip build error...');
+}

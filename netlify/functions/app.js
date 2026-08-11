@@ -1045,7 +1045,7 @@ async function handleAPI(request, pathname) {
       const meta = {
         token,
         name: projectName,
-        status: 'uploading',
+        status: body.empty ? 'empty' : 'uploading',
         createdAt: new Date().toISOString(),
         fileCount: 0,
         entryPath: body.entryPath ? sanitizePath(body.entryPath) : '',
@@ -1053,7 +1053,7 @@ async function handleAPI(request, pathname) {
         ownerId: currentUser ? currentUser.id : null,
       };
       await writeMeta(token, meta, true);
-      await writeFileIndex(token, []);
+      if (!body.empty) await writeFileIndex(token, []);
       return jsonResponse({ token, uploadUrl: `/api/prototypes/${token}/files` });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);

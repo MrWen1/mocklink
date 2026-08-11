@@ -278,9 +278,11 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, aut
   }
   flushBatch();
 
-  // 阶段 3：并行上传批次（并发度 3）
+  // 阶段 3：串行上传批次。
+  // 服务端文件索引采用读-合并-写回方式，并发写入会造成后写批次覆盖先写批次，
+  // 进而导致发布校验误报 data/document.js、data/styles.css 等关键资源缺失。
   let batchDone = skippedIncremental + skipped + failed;
-  await pMap(batches, async (batch) => {
+  for (const batch of batches) {
     try {
       if (batch.length === 1 && batch[0].size > maxBatchBytes) {
         await postJSONWithRetry(`${server}/api/prototypes/${token}/files`, {
@@ -299,7 +301,7 @@ async function uploadResourcesInBatches({ resources, baseUrl, server, token, aut
       batchDone += batch.length;
     }
     onProgress(batchDone, resources.length, failed);
-  }, 3);  // 3 批并发（原串行）
+  }
 
   done = batchDone;
   return { failed, failedPaths, skipped, skippedPaths, skippedIncremental };

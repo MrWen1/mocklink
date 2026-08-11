@@ -1121,7 +1121,7 @@ async function handleAPI(req, res, urlParts) {
       const meta = {
         token,
         name: projectName,
-        status: 'uploading',
+        status: body.empty ? 'empty' : 'uploading',
         createdAt: new Date().toISOString(),
         fileCount: 0,
         entryPath: body.entryPath ? sanitizePath(body.entryPath) : '',

@@ -534,6 +534,7 @@
     flex-shrink: 0;
   }
   .proto-name .status-dot.ready { background: var(--accent); }
+  .proto-name .status-dot.empty { background: var(--muted-light); }
   .proto-name .status-dot.cleared { background: var(--warning); }
   .proto-name .status-dot.uploading { background: #1890ff; }
   .proto-name .status-dot.unknown { background: var(--muted-light); }
@@ -560,6 +561,7 @@
     font-weight: 500;
   }
   .proto-status .badge.ready { background: var(--accent-bg); color: var(--accent); }
+  .proto-status .badge.empty { background: rgba(102,112,133,0.08); color: var(--muted); }
   .proto-status .badge.cleared { background: var(--warning-bg); color: var(--warning); }
   .proto-status .badge.uploading { background: rgba(24,144,255,0.08); color: #1890ff; }
 
@@ -1373,12 +1375,8 @@ function setupEventListeners() {
   });
   document.getElementById('uploadSubmitBtn').addEventListener('click', () => {
     if (!updatingToken) {
-      const projectNameInput = document.getElementById('projectNameInput');
-      if (!projectNameInput.value.trim()) {
-        showToast('请输入项目名称', 'error');
-        projectNameInput.focus();
-        return;
-      }
+      createEmptyProject();
+      return;
     }
     document.getElementById('fileInput').click();
   });
@@ -2193,6 +2191,7 @@ function goBackFromEmpty() {
 function getStatusInfo(status) {
   const map = {
     'ready': { label: '已发布', color: 'var(--accent)' },
+    'empty': { label: '空项目', color: 'var(--muted)' },
     'cleared': { label: '已清空', color: 'var(--warning)' },
     'uploading': { label: '上传中', color: '#1890ff' },
     'updating': { label: '更新中', color: '#1890ff' },
@@ -2275,6 +2274,40 @@ function downloadExtension() {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => showToast('扩展下载已开始', 'success'), 500);
+}
+
+async function createEmptyProject() {
+  const projectNameInput = document.getElementById('projectNameInput');
+  const projectName = projectNameInput.value.trim();
+  if (!projectName) {
+    showToast('请输入项目名称', 'error');
+    projectNameInput.focus();
+    return;
+  }
+
+  const selectedGroup = document.getElementById('groupSelect').value || null;
+  const submitBtn = document.getElementById('uploadSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '保存中...';
+
+  try {
+    const res = await authFetch(`${API}/api/prototypes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: projectName, groupId: selectedGroup, empty: true })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '创建失败');
+
+    showToast('空项目已保存', 'success');
+    closeModal('uploadModal');
+    loadPrototypes();
+  } catch (e) {
+    showToast('创建失败：' + e.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '提交';
+  }
 }
 
 // ===== Prototype Actions =====

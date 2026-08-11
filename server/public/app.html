@@ -491,7 +491,7 @@
     background: var(--surface);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    overflow: hidden;
+    overflow: visible;
   }
   .proto-list-header {
     display: grid;
@@ -505,6 +505,7 @@
     font-weight: 500;
   }
   .proto-item {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr 120px 100px 140px 200px;
     gap: 12px;
@@ -514,6 +515,7 @@
     transition: var(--transition);
     cursor: pointer;
   }
+  .proto-item:hover { z-index: 20; }
   .proto-item:last-child { border-bottom: none; }
   .proto-item:hover { background: #fafbfa; }
   .proto-item.disabled { cursor: default; }
@@ -574,6 +576,41 @@
     gap: 4px;
     justify-content: flex-end;
   }
+  .proto-more { position: relative; }
+  .proto-more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    min-width: 132px;
+    padding: 6px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    box-shadow: 0 16px 38px rgba(17,19,24,.14);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: var(--transition);
+    z-index: 1000;
+  }
+  .proto-more:hover .proto-more-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+  .proto-more-menu button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--ink);
+    text-align: left;
+  }
+  .proto-more-menu button:hover { background: var(--bg); }
+  .proto-more-menu button.danger { color: var(--danger); }
+  .proto-more-menu button svg { width: 14px; height: 14px; }
   .proto-actions .act-btn {
     width: 30px;
     height: 30px;
@@ -593,7 +630,7 @@
   .proto-actions .act-btn svg { width: 16px; height: 16px; }
   .proto-actions .act-btn .tooltip {
     position: absolute;
-    bottom: -28px;
+    bottom: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%);
     background: var(--ink);
@@ -605,7 +642,16 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s;
-    z-index: 10;
+    z-index: 999;
+  }
+  .proto-actions .act-btn .tooltip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--ink);
   }
   .proto-actions .act-btn:hover .tooltip { opacity: 1; }
 
@@ -618,6 +664,19 @@
   .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4; }
   .empty-state p { font-size: 14px; }
   .empty-state .hint { font-size: 12px; margin-top: 4px; color: var(--muted-light); }
+  .empty-back-btn {
+    margin-top: 14px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: var(--transition);
+  }
+  .empty-back-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 
   /* ===== Loading ===== */
   .loading {
@@ -1093,6 +1152,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('uploadModal')">取消</button>
+      <button class="btn btn-primary" id="uploadSubmitBtn">提交</button>
     </div>
   </div>
 </div>
@@ -1309,6 +1369,17 @@ function setupEventListeners() {
 
   // Upload area click
   document.getElementById('uploadArea').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+  document.getElementById('uploadSubmitBtn').addEventListener('click', () => {
+    if (!updatingToken) {
+      const projectNameInput = document.getElementById('projectNameInput');
+      if (!projectNameInput.value.trim()) {
+        showToast('请输入项目名称', 'error');
+        projectNameInput.focus();
+        return;
+      }
+    }
     document.getElementById('fileInput').click();
   });
 
@@ -2022,6 +2093,7 @@ function renderPrototypes(prototypes) {
         </svg>
         <p>还没有原型项目</p>
         <p class="hint">点击「新建项目」上传你的第一个 Axure 原型</p>
+        <button class="empty-back-btn" onclick="goBackFromEmpty()">返回上一级</button>
       </div>`;
     return;
   }
@@ -2060,13 +2132,6 @@ function renderPrototypes(prototypes) {
           </svg>
           <span class="tooltip">修改名称</span>
         </button>
-        <button class="act-btn" onclick="event.stopPropagation(); updatePrototype('${p.token}')" title="更新">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-            <path d="M21 3v5h-5"/>
-          </svg>
-          <span class="tooltip">更新</span>
-        </button>
         <button class="act-btn" onclick="event.stopPropagation(); sharePrototype('${p.token}', '${escapeHtml(p.name)}')" title="分享">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -2074,36 +2139,54 @@ function renderPrototypes(prototypes) {
           </svg>
           <span class="tooltip">分享</span>
         </button>
-        <button class="act-btn" onclick="event.stopPropagation(); movePrototype('${p.token}', '${escapeHtml(p.name)}')" title="移动分组">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="5 9 2 12 5 15"/>
-            <polyline points="9 5 12 2 15 5"/>
-            <polyline points="15 19 12 22 9 19"/>
-            <polyline points="19 9 22 12 19 15"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <line x1="12" y1="2" x2="12" y2="22"/>
-          </svg>
-          <span class="tooltip">移动分组</span>
-        </button>
-        <button class="act-btn" onclick="event.stopPropagation(); clearHtml('${p.token}', '${escapeHtml(p.name)}')" title="清空HTML">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
-          <span class="tooltip">清空HTML</span>
-        </button>
-        <button class="act-btn danger" onclick="event.stopPropagation(); deletePrototype('${p.token}', '${escapeHtml(p.name)}')" title="删除">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-          </svg>
-          <span class="tooltip">删除</span>
-        </button>
+        <div class="proto-more" onclick="event.stopPropagation()">
+          <button class="act-btn" title="更多">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+            </svg>
+            <span class="tooltip">更多</span>
+          </button>
+          <div class="proto-more-menu">
+            <button onclick="updatePrototype('${p.token}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+              更新
+            </button>
+            <button onclick="movePrototype('${p.token}', '${escapeHtml(p.name)}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+              移动分组
+            </button>
+            <button onclick="clearHtml('${p.token}', '${escapeHtml(p.name)}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              清空HTML
+            </button>
+            <button class="danger" onclick="deletePrototype('${p.token}', '${escapeHtml(p.name)}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              删除
+            </button>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
 
   el.innerHTML = html;
+}
+
+function goBackFromEmpty() {
+  if (selectedGroupId && selectedGroupId !== 'all') {
+    const currentGroup = allGroups.find(g => g.id === selectedGroupId);
+    if (currentGroup && currentGroup.parentId) {
+      selectGroup(currentGroup.parentId);
+      return;
+    }
+    selectGroup('all');
+    return;
+  }
+  if (document.referrer && document.referrer !== location.href) {
+    history.back();
+    return;
+  }
+  location.href = '/';
 }
 
 // ===== Helper Functions =====
@@ -2173,6 +2256,7 @@ function openUploadModal(title) {
   document.getElementById('projectNameField').style.display = isUpdate ? 'none' : 'block';
   document.getElementById('groupSelectField').style.display = isUpdate ? 'none' : 'block';
   document.getElementById('uploadArea').style.display = isUpdate ? 'block' : 'none';
+  document.getElementById('uploadSubmitBtn').textContent = isUpdate ? '选择文件夹并更新' : '提交';
   document.getElementById('uploadInfo').innerHTML = isUpdate
     ? '<b>使用说明：</b><br>1. 选择新的 Axure 原型文件夹，系统会保持原分享链接不变<br>2. 上传完成后自动更新线上内容<br>3. 推荐优先使用 Chrome 扩展进行一键同步'
     : '<b>使用说明：</b><br>1. 点击右上角「Chrome 扩展」，下载并安装 MockLink 扩展<br>2. 打开 Axure 原型页面，使用扩展一键同步上传；后续修改后再次同步，即可实时更新内容';

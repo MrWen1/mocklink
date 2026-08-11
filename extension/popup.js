@@ -1,5 +1,6 @@
 // MockLink Chrome 扩展 - 弹窗逻辑
 // 检测 Axure 原型页面，一键同步到 MockLink
+// 上传逻辑已迁移至 background.js (Service Worker)，popup 仅负责 UI 和状态显示
 
 const DEFAULT_SERVER = 'https://mocklink.netlify.app';
 
@@ -31,20 +32,126 @@ if (versionText) versionText.textContent = EXTENSION_VERSION;
 // 状态
 let detectedAxure = false;
 let detectedName = null;
-let isSyncing = false;
 let projects = [];
 let selectedProject = { mode: 'new', token: null, name: '' };
 let authToken = null;
 let currentUser = null;
+let currentSyncState = null; // 缓存同步状态，用于判断是否正在同步
 
 // ===== 初始化 =====
-chrome.storage.local.get(['authToken'], async (r) => {
+chrome.storage.local.get(['authToken', 'syncState'], async (r) => {
   authToken = r.authToken || await readPlatformCookieToken();
   await refreshAuthState();
   updateSyncButtonText();
+
+  // 恢复同步状态（popup 重新打开时）
+  if (r.syncState) {
+    renderSyncState(r.syncState);
+  }
+
   loadProjects();
   detectCurrentTab();
 });
+
+// 监听 storage 变化，实时更新 UI（popup 打开时）
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local') return;
+  if (changes.syncState) {
+    renderSyncState(changes.syncState.newValue);
+  }
+});
+
+// ===== 同步状态渲染 =====
+function renderSyncState(state) {
+  currentSyncState = state;
+  if (!state) {
+    // 清除状态
+    progress.classList.remove('show');
+    result.classList.remove('show');
+    errEl.classList.remove('show');
+    syncBtn.disabled = !detectedAxure || !currentUser;
+    return;
+  }
+
+  switch (state.state) {
+    case 'collecting':
+    case 'checking':
+      progress.classList.add('show');
+      result.classList.remove('show');
+      errEl.classList.remove('show');
+      syncBtn.disabled = true;
+      statusText.textContent = state.message || '正在收集原型文件...';
+      doneCount.textContent = '0';
+      totalCount.textContent = '0';
+      bar.style.width = '0%';
+      break;
+
+    case 'uploading':
+      progress.classList.add('show');
+      result.classList.remove('show');
+      errEl.classList.remove('show');
+      syncBtn.disabled = true;
+      statusText.textContent = state.message || '上传文件中...';
+      {
+        const done = state.progress?.done || 0;
+        const total = state.progress?.total || 0;
+        const failed = state.progress?.failed || 0;
+        doneCount.textContent = String(done);
+        totalCount.textContent = String(total);
+        if (total > 0) {
+          bar.style.width = (done / total * 100) + '%';
+        }
+      }
+      break;
+
+    case 'publishing':
+      progress.classList.add('show');
+      result.classList.remove('show');
+      errEl.classList.remove('show');
+      syncBtn.disabled = true;
+      statusText.textContent = state.message || '正在发布...';
+      {
+        const total = state.progress?.total || 0;
+        doneCount.textContent = String(total);
+        totalCount.textContent = String(total);
+        bar.style.width = '100%';
+      }
+      break;
+
+    case 'done':
+      progress.classList.remove('show');
+      result.classList.add('show');
+      errEl.classList.remove('show');
+      syncBtn.disabled = !detectedAxure || !currentUser;
+      shareInput.value = state.shareUrl || '';
+      statusText.textContent = '同步成功！';
+
+      // 自动复制
+      if (state.shareUrl) {
+        navigator.clipboard.writeText(state.shareUrl).catch(() => {});
+      }
+
+      // 显示增量跳过信息
+      if (state.skippedFiles > 0) {
+        hintEl.textContent = `增量更新：跳过 ${state.skippedFiles} 个未变更文件，链接已自动复制到剪贴板`;
+      } else {
+        hintEl.textContent = '链接已自动复制到剪贴板';
+      }
+
+      // 刷新项目列表
+      loadProjects();
+      break;
+
+    case 'error':
+      progress.classList.remove('show');
+      result.classList.remove('show');
+      errEl.classList.add('show');
+      errEl.textContent = state.message || '同步失败';
+      syncBtn.disabled = !detectedAxure || !currentUser;
+      setTimeout(() => errEl.classList.remove('show'), 8000);
+      break;
+  }
+}
 
 projectInput.addEventListener('focus', () => {
   renderProjectDropdown(projectInput.value);
@@ -149,7 +256,10 @@ function renderAuthState(message = '') {
     revokeAuthBtn.style.display = 'none';
     hintEl.textContent = message || '请先授权登录 MockLink 账号，项目会同步到该账号下。';
   }
-  syncBtn.disabled = !detectedAxure || !currentUser;
+  // 不覆盖正在同步中的状态
+  if (!currentSyncState || currentSyncState.state === 'done' || currentSyncState.state === 'error') {
+    syncBtn.disabled = !detectedAxure || !currentUser;
+  }
 }
 
 async function cancelAuthorization() {
@@ -218,7 +328,10 @@ async function detectCurrentTab() {
 function showDetectFound(name) {
   detectStatus.className = 'detect-status found';
   detectStatus.innerHTML = '<div class="detect-icon"></div><span>检测到 Axure 原型：<b>' + escapeHtml(name) + '</b></span>';
-  syncBtn.disabled = !currentUser;
+  // 不覆盖正在同步中的状态
+  if (!currentSyncState || currentSyncState.state === 'done' || currentSyncState.state === 'error') {
+    syncBtn.disabled = !currentUser;
+  }
 }
 
 function showDetectNotfound(msg) {
@@ -342,9 +455,14 @@ function updateSyncButtonText() {
   syncLabel.textContent = label;
 }
 
-// ===== 一键同步 =====
+// ===== 一键同步（发消息给 Service Worker） =====
 syncBtn.addEventListener('click', async () => {
-  if (isSyncing) return;
+  // 检查是否正在同步
+  const { syncState } = await chrome.storage.local.get(['syncState']);
+  if (syncState && ['collecting', 'checking', 'uploading', 'publishing'].includes(syncState.state)) {
+    return; // 正在同步中，忽略
+  }
+
   const project = selectedProject && selectedProject.mode === 'existing'
     ? selectedProject
     : { mode: 'new', token: null, name: projectInput.value.trim() };
@@ -353,315 +471,53 @@ syncBtn.addEventListener('click', async () => {
 });
 
 async function startSync(project) {
-  isSyncing = true;
   errEl.classList.remove('show');
   result.classList.remove('show');
   syncBtn.disabled = true;
 
-  const server = getServer();
   if (!await refreshAuthState()) {
     showError('请先授权登录 MockLink 账号');
-    resetState();
+    syncBtn.disabled = !detectedAxure || !currentUser;
     return;
   }
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) { showError('无法获取当前标签页'); resetState(); return; }
-
-    // 1. 收集资源
-    showProgress('正在收集原型文件...', 0, 0);
-
-    const collectResponse = await chrome.tabs.sendMessage(tab.id, { type: 'COLLECT_RESOURCES' });
-
-    if (chrome.runtime.lastError || !collectResponse || !collectResponse.success) {
-      showError('收集文件失败: ' + (collectResponse?.error || chrome.runtime.lastError?.message || '未知错误'));
-      resetState();
+    if (!tab) {
+      showError('无法获取当前标签页');
+      syncBtn.disabled = !detectedAxure || !currentUser;
       return;
     }
 
-    if (collectResponse.collectorVersion !== EXTENSION_VERSION) {
-      showError(`页面采集脚本版本不一致（页面 ${collectResponse.collectorVersion || '旧版本'}，扩展 ${EXTENSION_VERSION}）。请刷新 Axure 页面后再同步。`);
-      resetState();
-      return;
-    }
-
-    const { baseUrl, resources, name, entryPath } = collectResponse;
-    const protoName = project.mode === 'new'
-      ? (project.name || name || detectedName || '未命名原型')
-      : (project.name || name || detectedName || '未命名原型');
-
-    if (!resources || resources.length === 0) {
-      showError('未找到任何原型文件');
-      resetState();
-      return;
-    }
-
-    // 2. 创建原型或更新
-    const updateToken = project.mode === 'existing' ? project.token : null;
-    showProgress(updateToken ? '清空旧项目文件...' : '创建新项目...', 0, resources.length);
-
-    let token;
-    if (updateToken) {
-      const res = await apiFetch(`/api/prototypes/${updateToken}/update`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: protoName })
-      });
-      if (!res.ok) throw new Error('更新失败: HTTP ' + res.status);
-      token = updateToken;
-    } else {
-      const res = await apiFetch('/api/prototypes', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: protoName })
-      });
-      if (!res.ok) throw new Error('创建失败: HTTP ' + res.status);
-      token = (await res.json()).token;
-    }
-
-    // 3. 批量上传文件（带重试）
-    showProgress('上传文件中...', 0, resources.length);
-    const { failed, failedPaths, skipped, skippedPaths } = await uploadResourcesInBatches({
-      resources,
-      baseUrl,
-      server,
-      token,
-      onProgress(done, total, failedCount) {
-        showProgress(failedCount > 0 ? `上传中... (${failedCount} 失败)` : '上传文件中...', done, total);
+    // 发送消息给 background.js (Service Worker) 开始同步
+    // 上传逻辑在 SW 中执行，popup 关闭也不影响
+    chrome.runtime.sendMessage(
+      {
+        type: 'START_SYNC',
+        tabId: tab.id,
+        project,
+        authToken,
       },
-    });
-
-    if (failed > 0) {
-      const sample = failedPaths.slice(0, 5).join('；');
-      throw new Error(`有 ${failed} 个资源上传失败，已停止发布。失败示例：${sample}`);
-    }
-
-    if (skipped > 0) {
-      console.warn(`[MockLink] ${skipped} 个资源在原型中不存在（404），已跳过：`, skippedPaths);
-    }
-
-    // 4. 发布
-    showProgress('文件已全部上传，正在发布...', resources.length, resources.length);
-    const pubRes = await apiFetch(`/api/prototypes/${token}/publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entryPath })
-    });
-    if (!pubRes.ok) {
-      let reason = 'HTTP ' + pubRes.status;
-      try {
-        const errData = await pubRes.json();
-        reason = errData.error || reason;
-      } catch (e) {}
-      throw new Error('发布失败: ' + reason);
-    }
-    const pubData = await pubRes.json();
-    if (!pubData.hasIndex) {
-      throw new Error('发布失败：未找到可作为入口的 HTML 文件，请确认当前打开的是 Axure 发布目录内的页面');
-    }
-
-    const shareUrl = server + pubData.shareUrl;
-
-    // 5. 显示结果
-    showProgress('同步成功！', resources.length, resources.length);
-    progress.classList.remove('show');
-    result.classList.add('show');
-    shareInput.value = shareUrl;
-    statusText.textContent = '同步成功！';
-
-    // 自动复制
-    let hintMsg = '链接已自动复制到剪贴板';
-    if (skipped > 0) {
-      hintMsg += `（${skipped} 个不存在的资源已跳过）`;
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      hintEl.textContent = hintMsg;
-    } catch (e) {
-      hintEl.textContent = skipped > 0 ? `${skipped} 个不存在的资源已跳过` : '';
-    }
-
-    await loadProjects(token);
-
+      (response) => {
+        // response 在 SW 完成或失败后返回
+        // 但 UI 更新已通过 storage.onChanged 实时处理
+        if (chrome.runtime.lastError) {
+          showError('同步启动失败: ' + chrome.runtime.lastError.message);
+          syncBtn.disabled = !detectedAxure || !currentUser;
+        }
+      }
+    );
   } catch (e) {
     showError('同步失败: ' + e.message);
-  } finally {
-    resetState();
+    syncBtn.disabled = !detectedAxure || !currentUser;
   }
-}
-
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunks = [];
-  for (let i = 0; i < bytes.length; i += 8192) {
-    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 8192)));
-  }
-  return btoa(chunks.join(''));
-}
-
-async function fetchResourceAsUploadFile(item, baseUrl) {
-  const path = typeof item === 'string' ? item : item.path;
-  const sourceUrl = typeof item === 'string' ? new URL(item, baseUrl).href : item.url;
-  const fileUrl = sourceUrl || new URL(path, baseUrl).href;
-  const fileRes = await fetch(fileUrl);
-  if (!fileRes.ok) {
-    const err = new Error(`HTTP ${fileRes.status}`);
-    err.statusCode = fileRes.status;
-    err.isNotFound = fileRes.status === 404;
-    throw err;
-  }
-  const buffer = await fileRes.arrayBuffer();
-  return {
-    path,
-    content: arrayBufferToBase64(buffer),
-    size: buffer.byteLength,
-  };
-}
-
-function isIgnorableMissingPrototypeResource(relPath) {
-  const p = String(relPath || '')
-    .replace(/\\/g, '/')
-    .replace(/\.\./g, '')
-    .replace(/^\/+/, '')
-    .toLowerCase();
-  return (
-    p.startsWith('googlefonts/') ||
-    p === 'resources/css/pie.htc' ||
-    p.startsWith('resources/css/previewfonts/') ||
-    p.startsWith('resources/css/images/ui-') ||
-    p === 'resources/axurerp_pagescript.js' ||
-    p.startsWith('plugins/handoff/') ||
-    p.startsWith('plugins/sitemap/styles/images/')
-  );
-}
-
-async function postJSONWithRetry(url, body, retries = 3) {
-  let lastError = '';
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(body),
-      });
-      if (res.ok) return;
-      try {
-        const data = await res.json();
-        lastError = data.error || `HTTP ${res.status}`;
-      } catch (e) {
-        lastError = `HTTP ${res.status}`;
-      }
-    } catch (e) {
-      lastError = e.message || '网络错误';
-    }
-    if (attempt < retries - 1) {
-      await new Promise(resolve => setTimeout(resolve, 350 * (attempt + 1)));
-    }
-  }
-  throw new Error(lastError || '上传接口错误');
-}
-
-async function uploadResourcesInBatches({ resources, baseUrl, server, token, onProgress }) {
-  const maxBatchBytes = 1.5 * 1024 * 1024;
-  const maxBatchFiles = 40;
-  let done = 0;
-  let failed = 0;
-  let skipped = 0;
-  const failedPaths = [];
-  const skippedPaths = [];
-  const fetchedFiles = [];
-  const batches = [];
-  let current = [];
-  let currentBytes = 0;
-
-  function flushBatch() {
-    if (!current.length) return;
-    batches.push(current);
-    current = [];
-    currentBytes = 0;
-  }
-
-  await pMap(resources, async (item, index) => {
-    const path = typeof item === 'string' ? item : item.path;
-    try {
-      const file = await fetchResourceAsUploadFile(item, baseUrl);
-      fetchedFiles.push({ ...file, order: index });
-    } catch (e) {
-      if (e.isNotFound && isIgnorableMissingPrototypeResource(path)) {
-        skipped++;
-        skippedPaths.push(path);
-      } else {
-        failed++;
-        failedPaths.push(`${path}（${e.message || '读取失败'}）`);
-      }
-    }
-  }, 6);
-
-  fetchedFiles.sort((a, b) => a.order - b.order);
-  for (const file of fetchedFiles) {
-    if (file.size > maxBatchBytes) {
-      flushBatch();
-      batches.push([file]);
-    } else {
-      if (current.length >= maxBatchFiles || currentBytes + file.size > maxBatchBytes) flushBatch();
-      current.push(file);
-      currentBytes += file.size;
-    }
-  }
-  flushBatch();
-
-  for (const batch of batches) {
-    try {
-      if (batch.length === 1 && batch[0].size > maxBatchBytes) {
-        await postJSONWithRetry(`${server}/api/prototypes/${token}/files`, {
-          path: batch[0].path,
-          content: batch[0].content,
-        });
-      } else {
-        await postJSONWithRetry(`${server}/api/prototypes/${token}/files/batch`, {
-          files: batch.map(({ path, content }) => ({ path, content })),
-        });
-      }
-      done += batch.length;
-    } catch (e) {
-      failed += batch.length;
-      batch.forEach(file => failedPaths.push(`${file.path}（${e.message || '上传失败'}）`));
-      done += batch.length;
-    }
-    onProgress(done, resources.length, failed);
-  }
-
-  return { failed, failedPaths, skipped, skippedPaths };
-}
-
-// ===== 并发控制 =====
-async function pMap(items, fn, concurrency = 5) {
-  let i = 0;
-  const workers = Array(Math.min(concurrency, items.length)).fill(0).map(async () => {
-    while (i < items.length) { const idx = i++; await fn(items[idx], idx); }
-  });
-  await Promise.all(workers);
 }
 
 // ===== UI 辅助 =====
-function showProgress(text, done, total) {
-  progress.classList.add('show');
-  statusText.textContent = text;
-  doneCount.textContent = done;
-  totalCount.textContent = total || done;
-  if (total > 0) {
-    bar.style.width = (done / total * 100) + '%';
-  }
-}
-
 function showError(msg) {
   errEl.textContent = msg;
   errEl.classList.add('show');
   setTimeout(() => errEl.classList.remove('show'), 8000);
-}
-
-function resetState() {
-  isSyncing = false;
-  syncBtn.disabled = !detectedAxure || !currentUser;
 }
 
 function escapeHtml(str) {

@@ -350,6 +350,44 @@
     border: 1px solid rgba(17,19,24,.08);
     padding: 22px;
   }
+  .extension-preview {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    gap: 18px;
+    align-items: center;
+  }
+  .ext-panel {
+    border-radius: 26px;
+    background: #fff;
+    box-shadow: 0 26px 70px rgba(22,24,45,.10);
+    padding: 22px;
+    animation: bob 3.2s ease-in-out infinite alternate;
+  }
+  .ext-brand { display:flex; align-items:center; gap: 10px; margin-bottom: 18px; }
+  .ext-logo { width: 38px; height: 38px; border-radius: 12px; background: var(--green); color:#fff; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 22px; }
+  .ext-brand b { display:block; font-size: 20px; letter-spacing: -.04em; }
+  .ext-brand span { display:block; margin-top:2px; color: var(--muted); font-size: 12px; }
+  .ext-mini-card { border-radius: 16px; background: #f3f6f4; border: 1px solid rgba(10,143,90,.14); padding: 14px; margin-bottom: 12px; }
+  .ext-mini-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .ext-mini-value { font-size: 18px; font-weight: 850; letter-spacing: -.03em; }
+  .ext-detect { display:flex; align-items:center; gap: 8px; border-radius: 14px; padding: 12px 14px; color: var(--green); background: rgba(10,143,90,.08); font-weight: 800; font-size: 13px; }
+  .ext-detect i { width: 16px; height: 16px; border-radius: 50%; position: relative; }
+  .ext-detect i::after { content:''; position:absolute; left:4px; top:1px; width:5px; height:10px; border: solid var(--green); border-width:0 2px 2px 0; transform: rotate(45deg); }
+  .ext-flow { display:grid; gap: 14px; }
+  .flow-card {
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: var(--shadow-soft);
+    padding: 20px 22px;
+    animation: bob 3s ease-in-out infinite alternate;
+  }
+  .flow-card:nth-child(2) { animation-delay: -1.1s; }
+  .flow-card b { display:block; margin-bottom: 8px; font-size: 18px; letter-spacing: -.04em; }
+  .flow-card span { display:block; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .sync-progress { height: 7px; margin-top: 14px; border-radius: 999px; background: #e8ecef; overflow:hidden; }
+  .sync-progress i { display:block; width: 58%; height:100%; border-radius: 999px; background: linear-gradient(90deg, var(--green), var(--green-2)); animation: progressGlow 2.2s ease-in-out infinite alternate; }
+  @keyframes progressGlow { to { width: 74%; } }
   .annotate {
     position: absolute;
     border-radius: 18px;
@@ -4075,7 +4113,7 @@
 <section class="section reveal show" id="services">
   <div class="section-head"><div><div class="section-kicker">Axure Services</div><h2>这是 MockLink 的核心能力</h2></div><p class="section-desc">围绕 Axure 原型发布、云端托管和团队评审，提供从上传到分享的一整套轻量工作流。</p></div>
   <div class="service-grid">
-    <article class="service-card"><div class="card-no">01</div><h3>托管服务</h3><p>支持云端发布、分享你的原型，项目资料统一管理，链接可直接交付给团队。</p></article>
+    <article class="service-card"><div class="card-no">01</div><h3>托管服务</h3><p>支持云端和私有化部署发布、分享你的原型，企业级安全保障。</p></article>
     <article class="service-card"><div class="card-no">02</div><h3>一键同步</h3><p>通过 Chrome 扩展读取 Axure 发布后的 HTML 资源，不用手动压缩和上传。</p></article>
     <article class="service-card"><div class="card-no">03</div><h3>在线预览</h3><p>保持 Axure 原始文件结构，支持在线查看可交互原型，减少本地环境依赖。</p></article>
     <article class="service-card"><div class="card-no">04</div><h3>项目分组</h3><p>按客户、产品线或版本整理原型资产，持续沉淀团队的产品资料库。</p></article>
@@ -4088,7 +4126,31 @@
   <div class="section-head"><div><div class="section-kicker">Chrome Extension</div><h2>一键同步你的 Axure 原型</h2></div><p class="section-desc">面向 Axure 原型发布场景的 Chrome 扩展。打开本地或线上 Axure 页面，即可检测、上传、更新项目。</p></div>
   <div class="split-panel">
     <div class="intro-card"><h3>让需求贴在真实原型上</h3><p>产品、设计、研发围绕同一份原型资产协作，评审、修改、交付都有统一上下文。</p><div class="prompt-box">请把当前 Axure 原型同步到 MockLink，并生成一个可以直接分享给评审同事的链接。</div><div class="ai-row"><a href="/extension.zip" download="">下载扩展</a><a href="/login.html">授权登录</a><a href="/app.html">我的托管</a></div></div>
-    <div class="visual-card"><div class="browser-mock"><div class="annotate one"><b>检测到 Axure 原型</b><span>扩展自动识别页面资源和入口文件。</span></div><div class="annotate two"><b>更新到选中项目</b><span>保持分享链接不变，团队始终访问最新版本。</span></div></div></div>
+    <div class="visual-card">
+      <div class="browser-mock">
+        <div class="extension-preview">
+          <div class="ext-panel">
+            <div class="ext-brand">
+              <div class="ext-logo">M</div>
+              <div><b>MockLink</b><span>Axure 原型一键同步</span></div>
+            </div>
+            <div class="ext-mini-card">
+              <div class="ext-mini-label">同步账号</div>
+              <div class="ext-mini-value">管理员</div>
+            </div>
+            <div class="ext-mini-card">
+              <div class="ext-mini-label">选中项目</div>
+              <div class="ext-mini-value">项目A</div>
+            </div>
+            <div class="ext-detect"><i></i>检测到 Axure 原型</div>
+          </div>
+          <div class="ext-flow">
+            <div class="flow-card"><b>更新到选中项目</b><span>保持分享链接不变，团队始终访问最新版本。</span></div>
+            <div class="flow-card"><b>同步上传中</b><span>自动收集页面资源，进度实时可见。</span><div class="sync-progress"><i></i></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -4096,8 +4158,8 @@
   <div class="section-head"><div><div class="section-kicker">MockLink Workflow</div><h2>把原型变成<br>可分享的交付物</h2></div><p class="section-desc">把 Axure 原型从本地文件变成可访问、可协作、可长期维护的在线资产。</p></div>
   <div class="make-grid">
     <article class="make-card"><span class="label">TOOLS</span><h3>主流工具接入</h3><p>兼容 Axure RP、本地 HTML、Chrome 浏览器等常见产品设计环境。</p><div class="ticker"><span>Axure RP · Chrome · HTML · Prototype · Review · Share · </span></div></article>
-    <article class="make-card"><span class="label">CORE</span><h3>MockLink 托管</h3><p>账号、项目、分组、空间配额和分享链接整合在一个后台，统一管理。</p><div class="ticker"><span>Host · Preview · Group · Quota · Team · Cloud · </span></div></article>
-    <article class="make-card"><span class="label">DELIVERY</span><h3>完整产品交付</h3><p>原型即交付物，一个链接完成协作，支持长期迭代和历史项目沉淀。</p></article>
+    <article class="make-card"><span class="label">CORE</span><h3>MockLink托管</h3><p>账号、项目、分组、空间配额和分享链接整合在一个后台，统一管理。</p><div class="ticker"><span>Account · Project · Group · Quota · Share · Dashboard · </span></div></article>
+    <article class="make-card"><span class="label">DELIVERY</span><h3>完整产品交付</h3><p>原型即PRD，一个链接完成协作，支持长期迭代和历史项目沉淀。</p></article>
   </div>
 </section>
 

@@ -156,6 +156,29 @@ async function writeMeta(token, meta) {
   );
 }
 
+// ---------- 文件索引（用于增量更新） ----------
+async function readFileIndex(token) {
+  const indexPath = path.join(STORAGE_DIR, token, 'files.json');
+  if (!existsSync(indexPath)) return [];
+  try {
+    const data = JSON.parse(await fs.readFile(indexPath, 'utf8'));
+    return Array.isArray(data) ? data : (data.files || []);
+  } catch (e) {
+    return [];
+  }
+}
+
+async function writeFileIndex(token, files) {
+  await fs.writeFile(
+    path.join(STORAGE_DIR, token, 'files.json'),
+    JSON.stringify(files, null, 2)
+  );
+}
+
+async function computeFileHash(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}
+
 // ---------- 读取请求体 ----------
 function readBody(req, maxBytes = 200 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
@@ -1144,10 +1167,26 @@ async function handleAPI(req, res, urlParts) {
         sendJSON(res, 403, { error: '非法路径' });
         return;
       }
+      const fileBuffer = Buffer.from(body.content, 'base64');
       await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.writeFile(dest, Buffer.from(body.content, 'base64'));
+      await fs.writeFile(dest, fileBuffer);
 
-      meta.fileCount = (meta.fileCount || 0) + 1;
+      // 更新文件索引（含 hash，用于增量更新）
+      const hash = await computeFileHash(fileBuffer);
+      const files = await readFileIndex(token);
+      const existing = files.find(item => item.path === relPath);
+      const item = {
+        path: relPath,
+        size: fileBuffer.byteLength,
+        hash,
+        contentType: getMime(relPath),
+        updatedAt: new Date().toISOString(),
+      };
+      if (existing) Object.assign(existing, item);
+      else files.push(item);
+      await writeFileIndex(token, files);
+
+      meta.fileCount = files.length;
       meta.updatedAt = new Date().toISOString();
       await writeMeta(token, meta);
       sendJSON(res, 200, { ok: true, path: relPath });
@@ -1187,21 +1226,97 @@ async function handleAPI(req, res, urlParts) {
         }
       }
 
+      const now = new Date().toISOString();
+      const filesIndex = await readFileIndex(token);
+      const byPath = new Map(filesIndex.map(f => [f.path, f]));
+
       for (const item of normalized) {
         const dest = path.join(dir, item.path);
         if (!path.resolve(dest).startsWith(dir + path.sep)) {
           sendJSON(res, 403, { error: '非法路径' });
           return;
         }
+        const fileBuffer = Buffer.from(item.content, 'base64');
         await fs.mkdir(path.dirname(dest), { recursive: true });
-        await fs.writeFile(dest, Buffer.from(item.content, 'base64'));
+        await fs.writeFile(dest, fileBuffer);
+
+        const hash = await computeFileHash(fileBuffer);
+        byPath.set(item.path, {
+          path: item.path,
+          size: fileBuffer.byteLength,
+          hash,
+          contentType: getMime(item.path),
+          updatedAt: now,
+        });
       }
 
-      const allFiles = await listPrototypeFiles(dir);
+      const allFiles = [...byPath.values()];
+      await writeFileIndex(token, allFiles);
       meta.fileCount = allFiles.length;
-      meta.updatedAt = new Date().toISOString();
+      meta.updatedAt = now;
       await writeMeta(token, meta);
       sendJSON(res, 200, { ok: true, count: normalized.length, paths: normalized.map(item => item.path) });
+    } catch (e) {
+      sendJSON(res, 500, { error: e.message });
+    }
+    return;
+  }
+
+  // GET /api/prototypes/:token/files — 获取文件列表（含 hash，用于增量更新）
+  const filesListMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/files$/);
+  if (filesListMatch && req.method === 'GET') {
+    try {
+      const token = filesListMatch[1];
+      const meta = await readMeta(token);
+      if (!meta) {
+        sendJSON(res, 404, { error: '原型不存在' });
+        return;
+      }
+      const files = await readFileIndex(token);
+      sendJSON(res, 200, {
+        files: files.map(f => ({ path: f.path, size: f.size, hash: f.hash || null, updatedAt: f.updatedAt })),
+      });
+    } catch (e) {
+      sendJSON(res, 500, { error: e.message });
+    }
+    return;
+  }
+
+  // POST /api/prototypes/:token/files/delete — 批量删除文件（增量更新：清理已移除文件）
+  const deleteFilesMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/files\/delete$/);
+  if (deleteFilesMatch && req.method === 'POST') {
+    try {
+      const token = deleteFilesMatch[1];
+      const dir = protoDir(token);
+      const meta = await readMeta(token);
+      if (!meta) {
+        sendJSON(res, 404, { error: '原型不存在' });
+        return;
+      }
+      const body = JSON.parse((await readBody(req)).toString());
+      const paths = Array.isArray(body.paths) ? body.paths.map(sanitizePath).filter(Boolean) : [];
+      if (!paths.length) {
+        sendJSON(res, 400, { error: '缺少要删除的文件路径' });
+        return;
+      }
+      const files = await readFileIndex(token);
+      const toDelete = new Set(paths);
+      const remaining = files.filter(f => !toDelete.has(f.path));
+      const deleted = files.filter(f => toDelete.has(f.path));
+
+      // 删除磁盘文件
+      for (const f of deleted) {
+        const fullPath = path.join(dir, f.path);
+        if (path.resolve(fullPath).startsWith(dir + path.sep)) {
+          await fs.unlink(fullPath).catch(() => {});
+        }
+      }
+
+      await writeFileIndex(token, remaining);
+      meta.fileCount = remaining.length;
+      meta.updatedAt = new Date().toISOString();
+      await writeMeta(token, meta);
+      sendJSON(res, 200, { ok: true, deleted: deleted.length, remaining: remaining.length });
     } catch (e) {
       sendJSON(res, 500, { error: e.message });
     }

@@ -46,6 +46,9 @@ const MIME = {
 
 const store = getStore(STORE_NAME, { consistency: 'strong' });
 
+// 模块级缓存：ensureAdminUser 只需在冷启动时执行一次
+let _adminEnsured = false;
+
 function getMime(filePath) {
   return MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
 }
@@ -165,9 +168,9 @@ function optionsResponse() {
   });
 }
 
-async function readJSON(key, fallback) {
+async function readJSON(key, fallback, consistency = 'strong') {
   try {
-    const value = await store.get(key, { type: 'json', consistency: 'strong' });
+    const value = await store.get(key, { type: 'json', consistency });
     return value ?? fallback;
   } catch (e) {
     return fallback;
@@ -287,7 +290,7 @@ async function verifyEmailCode(email, code) {
 }
 
 async function readGroups() {
-  const data = await readJSON(GROUPS_KEY, []);
+  const data = await readJSON(GROUPS_KEY, [], 'eventual');
   return Array.isArray(data) ? data : (data.groups || []);
 }
 
@@ -296,7 +299,7 @@ async function writeGroups(groups) {
 }
 
 async function readPrototypeIndex() {
-  const data = await readJSON(PROTOTYPES_INDEX_KEY, []);
+  const data = await readJSON(PROTOTYPES_INDEX_KEY, [], 'eventual');
   return Array.isArray(data) ? data : (data.tokens || []);
 }
 
@@ -318,16 +321,16 @@ async function removePrototypeToken(token) {
 }
 
 async function readMeta(token) {
-  return await readJSON(metaKey(token), null);
+  return await readJSON(metaKey(token), null, 'eventual');
 }
 
-async function writeMeta(token, meta) {
+async function writeMeta(token, meta, addToIndex = false) {
   await writeJSON(metaKey(token), meta);
-  await addPrototypeToken(token);
+  if (addToIndex) await addPrototypeToken(token);
 }
 
 async function readFileIndex(token) {
-  const data = await readJSON(filesIndexKey(token), []);
+  const data = await readJSON(filesIndexKey(token), [], 'eventual');
   return Array.isArray(data) ? data : (data.files || []);
 }
 
@@ -346,6 +349,7 @@ async function putPrototypeFile(token, relPath, buffer) {
     path: relPath,
     key,
     size: buffer.byteLength,
+    hash: crypto.createHash('sha256').update(buffer).digest('hex'),
     contentType: getMime(relPath),
     updatedAt: new Date().toISOString(),
   };
@@ -373,6 +377,7 @@ async function putPrototypeFilesBatch(token, items) {
       path: relPath,
       key,
       size: buffer.byteLength,
+      hash: crypto.createHash('sha256').update(buffer).digest('hex'),
       contentType: getMime(relPath),
       updatedAt: now,
     });
@@ -386,7 +391,7 @@ async function getPrototypeFile(token, relPath) {
   const files = await readFileIndex(token);
   const item = files.find(file => file.path === relPath);
   if (!item) return null;
-  const data = await store.get(item.key, { type: 'arrayBuffer' });
+  const data = await store.get(item.key, { type: 'arrayBuffer', consistency: 'eventual' });
   if (!data) return null;
   return { item, data };
 }
@@ -398,28 +403,33 @@ async function deletePrototypeFiles(token) {
 }
 
 async function deletePrototype(token) {
-  await deletePrototypeFiles(token);
-  await store.delete(metaKey(token)).catch(() => {});
-  await store.delete(filesIndexKey(token)).catch(() => {});
+  const files = await readFileIndex(token);
+  await Promise.all([
+    ...files.map(file => store.delete(file.key).catch(() => {})),
+    store.delete(metaKey(token)).catch(() => {}),
+    store.delete(filesIndexKey(token)).catch(() => {}),
+  ]);
   await removePrototypeToken(token);
 }
 
 async function listPrototypeMetas() {
   const tokens = await readPrototypeIndex();
-  const items = [];
-  for (const token of tokens) {
+  const results = await Promise.all(tokens.map(async (token) => {
     const meta = await readMeta(token);
-    if (!meta) continue;
+    if (!meta) return null;
     const files = await readFileIndex(token);
     const sizeBytes = files.reduce((sum, file) => sum + (Number(file.size) || 0), 0);
-    items.push({ token, meta, files, sizeBytes });
-  }
-  return items;
+    return { token, meta, files, sizeBytes };
+  }));
+  return results.filter(Boolean);
 }
 
-async function getUserUsage(userId) {
+async function getUserUsage(userId, user) {
   const items = await listPrototypeMetas();
-  const owned = items.filter(item => item.meta.ownerId === userId);
+  const isAdmin = user && user.role === 'admin';
+  const owned = items.filter(item =>
+    item.meta.ownerId === userId || (isAdmin && !item.meta.ownerId)
+  );
   return {
     projectCount: owned.length,
     storageBytes: owned.reduce((sum, item) => sum + item.sizeBytes, 0),
@@ -429,7 +439,7 @@ async function getUserUsage(userId) {
 async function assertUserQuota(user, deltaBytes = 0, deltaProjects = 0) {
   if (!user) return { ok: true };
   const quota = user.quota || DEFAULT_QUOTA;
-  const usage = await getUserUsage(user.id);
+  const usage = await getUserUsage(user.id, user);
   if (quota.projectLimit >= 0 && usage.projectCount + deltaProjects > quota.projectLimit) {
     return { ok: false, error: `项目数量已达配额上限（${quota.projectLimit} 个）` };
   }
@@ -464,8 +474,7 @@ async function getAuthUser(request) {
   const cookieToken = parseCookies(request).wc_auth_token;
   const tokens = [match ? match[1] : null, cookieToken].filter(Boolean);
   if (!tokens.length) return null;
-  const sessions = await readSessions();
-  const users = await readUsers();
+  const [sessions, users] = await Promise.all([readSessions(), readUsers()]);
   for (const token of tokens) {
     const session = sessions.find(s => s.token === token);
     if (!session) continue;
@@ -566,15 +575,17 @@ async function validatePrototypeReferences(token, files) {
     .map(file => file.path)
     .filter(filePath => /\.(html?|css)$/i.test(filePath));
 
-  for (const filePath of textFiles) {
-    const item = byPath.get(filePath);
-    if (!item) continue;
-    const data = await store.get(item.key, { type: 'arrayBuffer' });
-    if (!data) continue;
-    const text = Buffer.from(data).toString('utf8');
+  const textFileItems = textFiles.map(fp => byPath.get(fp)).filter(Boolean);
+  const fileDatas = await Promise.all(textFileItems.map(async (item) => {
+    const data = await store.get(item.key, { type: 'arrayBuffer', consistency: 'eventual' });
+    return { item, text: data ? Buffer.from(data).toString('utf8') : '' };
+  }));
+
+  for (const { item, text } of fileDatas) {
+    if (!text) continue;
     const refs = [];
 
-    if (/\.html?$/i.test(filePath)) {
+    if (/\.html?$/i.test(item.path)) {
       const attrMatches = text.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi);
       for (const match of attrMatches) refs.push(match[1]);
     }
@@ -583,7 +594,7 @@ async function validatePrototypeReferences(token, files) {
     for (const match of cssMatches) refs.push(match[1]);
 
     for (const ref of refs) {
-      const resolved = resolveRelativeAsset(filePath, ref);
+      const resolved = resolveRelativeAsset(item.path, ref);
       if (resolved && !existing.has(resolved) && !isIgnorableMissingPrototypeResource(resolved)) {
         missing.add(resolved);
       }
@@ -756,7 +767,7 @@ async function handleAPI(request, pathname) {
   if (pathname === '/api/auth/me' && request.method === 'GET') {
     const user = await getAuthUser(request);
     if (!user) return jsonResponse({ user: null });
-    const usage = await getUserUsage(user.id);
+    const usage = await getUserUsage(user.id, user);
     return jsonResponse({ user: publicUser(user), usage });
   }
 
@@ -764,10 +775,20 @@ async function handleAPI(request, pathname) {
     const { response } = await requireAdmin(request);
     if (response) return response;
     const users = await readUsers();
-    const data = [];
-    for (const user of users) {
-      data.push({ ...publicUser(user), usage: await getUserUsage(user.id) });
-    }
+    const items = await listPrototypeMetas();
+    const data = users.map(user => {
+      const isAdmin = (user.role || 'user') === 'admin';
+      const owned = items.filter(item =>
+        item.meta.ownerId === user.id || (isAdmin && !item.meta.ownerId)
+      );
+      return {
+        ...publicUser(user),
+        usage: {
+          projectCount: owned.length,
+          storageBytes: owned.reduce((sum, item) => sum + item.sizeBytes, 0),
+        },
+      };
+    });
     return jsonResponse({ users: data });
   }
 
@@ -802,7 +823,7 @@ async function handleAPI(request, pathname) {
       };
       users.push(user);
       await writeUsers(users);
-      return jsonResponse({ user: publicUser(user), usage: await getUserUsage(user.id) });
+      return jsonResponse({ user: publicUser(user), usage: await getUserUsage(user.id, user) });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
     }
@@ -838,7 +859,7 @@ async function handleAPI(request, pathname) {
         storageLimitBytes: Number.isFinite(storageLimitMB) ? Math.max(-1, Math.floor(storageLimitMB * 1024 * 1024)) : (users[idx].quota?.storageLimitBytes ?? DEFAULT_QUOTA.storageLimitBytes),
       };
       await writeUsers(users);
-      return jsonResponse({ user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id) });
+      return jsonResponse({ user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id, users[idx]) });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
     }
@@ -858,17 +879,18 @@ async function handleAPI(request, pathname) {
         if (adminCount <= 1) return jsonResponse({ error: '至少保留一个管理员账号' }, 400);
       }
       const removed = users.splice(idx, 1)[0];
-      await writeUsers(users);
       const sessions = await readSessions();
-      await writeSessions(sessions.filter(s => s.userId !== userId));
+      await Promise.all([
+        writeUsers(users),
+        writeSessions(sessions.filter(s => s.userId !== userId)),
+      ]);
       const items = await listPrototypeMetas();
-      for (const item of items) {
-        if (item.meta.ownerId === userId) {
-          item.meta.ownerId = null;
-          item.meta.updatedAt = new Date().toISOString();
-          await writeMeta(item.token, item.meta);
-        }
-      }
+      const now = new Date().toISOString();
+      await Promise.all(items.filter(item => item.meta.ownerId === userId).map(item => {
+        item.meta.ownerId = null;
+        item.meta.updatedAt = now;
+        return writeMeta(item.token, item.meta);
+      }));
       return jsonResponse({ ok: true, user: publicUser(removed) });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
@@ -891,7 +913,7 @@ async function handleAPI(request, pathname) {
         storageLimitBytes: Number.isFinite(storageLimitMB) ? Math.max(-1, Math.floor(storageLimitMB * 1024 * 1024)) : (users[idx].quota?.storageLimitBytes ?? DEFAULT_QUOTA.storageLimitBytes),
       };
       await writeUsers(users);
-      return jsonResponse({ user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id) });
+      return jsonResponse({ user: publicUser(users[idx]), usage: await getUserUsage(users[idx].id, users[idx]) });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
     }
@@ -960,13 +982,12 @@ async function handleAPI(request, pathname) {
       groups = groups.filter(g => !toDelete.has(g.id));
       await writeGroups(groups);
       const items = await listPrototypeMetas();
-      for (const item of items) {
-        if (item.meta.groupId && toDelete.has(item.meta.groupId)) {
-          item.meta.groupId = null;
-          item.meta.updatedAt = new Date().toISOString();
-          await writeMeta(item.token, item.meta);
-        }
-      }
+      const now = new Date().toISOString();
+      await Promise.all(items.filter(item => item.meta.groupId && toDelete.has(item.meta.groupId)).map(item => {
+        item.meta.groupId = null;
+        item.meta.updatedAt = now;
+        return writeMeta(item.token, item.meta);
+      }));
       return jsonResponse({ ok: true, message: '已删除分组' });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
@@ -980,9 +1001,9 @@ async function handleAPI(request, pathname) {
   if (pathname === '/api/prototypes' && request.method === 'GET') {
     try {
       const currentUser = await getAuthUser(request);
-      const users = await readUsers();
+      const [users, items] = await Promise.all([readUsers(), listPrototypeMetas()]);
       const prototypes = [];
-      for (const item of await listPrototypeMetas()) {
+      for (const item of items) {
         const meta = item.meta;
         if (currentUser && currentUser.role !== 'admin' && meta.ownerId && meta.ownerId !== currentUser.id) continue;
         const owner = users.find(u => u.id === meta.ownerId);
@@ -1031,7 +1052,7 @@ async function handleAPI(request, pathname) {
         groupId: body.groupId || null,
         ownerId: currentUser ? currentUser.id : null,
       };
-      await writeMeta(token, meta);
+      await writeMeta(token, meta, true);
       await writeFileIndex(token, []);
       return jsonResponse({ token, uploadUrl: `/api/prototypes/${token}/files` });
     } catch (e) {
@@ -1093,6 +1114,21 @@ async function handleAPI(request, pathname) {
       meta.updatedAt = new Date().toISOString();
       await writeMeta(token, meta);
       return jsonResponse({ ok: true, message: '已清空 HTML' });
+    } catch (e) {
+      return jsonResponse({ error: e.message }, 500);
+    }
+  }
+
+  const filesListMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/files$/);
+  if (filesListMatch && request.method === 'GET') {
+    try {
+      const token = filesListMatch[1];
+      const meta = await readMeta(token);
+      if (!meta) return jsonResponse({ error: '原型不存在' }, 404);
+      const files = await readFileIndex(token);
+      return jsonResponse({
+        files: files.map(f => ({ path: f.path, size: f.size, hash: f.hash || null, updatedAt: f.updatedAt })),
+      });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
     }
@@ -1160,6 +1196,30 @@ async function handleAPI(request, pathname) {
       meta.updatedAt = new Date().toISOString();
       await writeMeta(token, meta);
       return jsonResponse({ ok: true, count: paths.length, paths });
+    } catch (e) {
+      return jsonResponse({ error: e.message }, 500);
+    }
+  }
+
+  const deleteFilesMatch = pathname.match(/^\/api\/prototypes\/([^/]+)\/files\/delete$/);
+  if (deleteFilesMatch && request.method === 'POST') {
+    try {
+      const token = deleteFilesMatch[1];
+      const meta = await readMeta(token);
+      if (!meta) return jsonResponse({ error: '原型不存在' }, 404);
+      const body = await parseJSONBody(request);
+      const paths = Array.isArray(body.paths) ? body.paths.map(sanitizePath).filter(Boolean) : [];
+      if (!paths.length) return jsonResponse({ error: '缺少要删除的文件路径' }, 400);
+      const files = await readFileIndex(token);
+      const toDelete = new Set(paths);
+      const remaining = files.filter(f => !toDelete.has(f.path));
+      const deleted = files.filter(f => toDelete.has(f.path));
+      await Promise.all(deleted.map(f => store.delete(f.key).catch(() => {})));
+      await writeFileIndex(token, remaining);
+      meta.fileCount = remaining.length;
+      meta.updatedAt = new Date().toISOString();
+      await writeMeta(token, meta);
+      return jsonResponse({ ok: true, deleted: deleted.length, remaining: remaining.length });
     } catch (e) {
       return jsonResponse({ error: e.message }, 500);
     }
@@ -1284,7 +1344,10 @@ export default async (request) => {
   const pathname = normalizePathname(request);
 
   try {
-    await ensureAdminUser();
+    if (!_adminEnsured) {
+      await ensureAdminUser();
+      _adminEnsured = true;
+    }
 
     if (pathname.startsWith('/api/')) {
       return await handleAPI(request, pathname);

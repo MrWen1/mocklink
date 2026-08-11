@@ -1,7 +1,7 @@
 // MockLink Chrome 扩展 - 内容脚本
 // 检测 Axure 原型页面，全面收集所有资源文件路径
 
-const MOCKLINK_COLLECTOR_VERSION = '2.3.1';
+const MOCKLINK_COLLECTOR_VERSION = '2.4.0';
 
 // ===== 检测当前页面是否为 Axure 原型 =====
 function detectAxure() {
@@ -345,39 +345,42 @@ async function collectAllResources() {
     } catch (e) {}
   }
 
-  // 7. 递归获取并解析每个 HTML 页面
+  // 7. 递归获取并解析每个 HTML 页面（并行）
   let iterations = 0;
   while (htmlPagesToParse.size > 0 && iterations < 100) {
     iterations++;
-    const page = htmlPagesToParse.values().next().value;
-    htmlPagesToParse.delete(page);
-    if (parsedHtmlPages.has(page)) continue;
-    parsedHtmlPages.add(page);
-    try {
-      const res = await fetch(baseUrl + page);
-      if (!res.ok) continue;
-      addResource(resources, resourceUrls, page, baseUrl);
-      const html = await res.text();
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      extractHtmlResources(doc, page, resources, cssFilesToParse, htmlPagesToParse, baseUrl);
-    } catch (e) {}
+    const batch = Array.from(htmlPagesToParse).slice(0, 10);
+    batch.forEach(p => htmlPagesToParse.delete(p));
+    const newPages = await Promise.all(batch.filter(p => !parsedHtmlPages.has(p)).map(async (page) => {
+      parsedHtmlPages.add(page);
+      try {
+        const res = await fetch(baseUrl + page);
+        if (!res.ok) return null;
+        addResource(resources, resourceUrls, page, baseUrl);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        extractHtmlResources(doc, page, resources, cssFilesToParse, htmlPagesToParse, baseUrl);
+        return page;
+      } catch (e) { return null; }
+    }));
   }
 
-  // 8. 递归获取并解析每个 CSS 文件
+  // 8. 递归获取并解析每个 CSS 文件（并行）
   iterations = 0;
   while (cssFilesToParse.size > 0 && iterations < 100) {
     iterations++;
-    const cssFile = cssFilesToParse.values().next().value;
-    cssFilesToParse.delete(cssFile);
-    if (parsedCssFiles.has(cssFile)) continue;
-    parsedCssFiles.add(cssFile);
-    try {
-      const res = await fetch(baseUrl + cssFile);
-      if (!res.ok) continue;
-      addResource(resources, resourceUrls, cssFile, baseUrl);
-      const cssText = await res.text();
-      extractCssUrls(cssText, cssFile, resources, cssFilesToParse, baseUrl);
-    } catch (e) {}
+    const batch = Array.from(cssFilesToParse).slice(0, 10);
+    batch.forEach(f => cssFilesToParse.delete(f));
+    await Promise.all(batch.filter(f => !parsedCssFiles.has(f)).map(async (cssFile) => {
+      parsedCssFiles.add(cssFile);
+      try {
+        const res = await fetch(baseUrl + cssFile);
+        if (!res.ok) return;
+        addResource(resources, resourceUrls, cssFile, baseUrl);
+        const cssText = await res.text();
+        extractCssUrls(cssText, cssFile, resources, cssFilesToParse, baseUrl);
+      } catch (e) {}
+    }));
   }
 
   // 9. 添加 Axure 常见资源路径（如果存在）
@@ -419,15 +422,14 @@ async function collectAllResources() {
   ];
   commonPaths.push(...plugins);
 
-  // 验证这些路径是否存在（HEAD 请求）
-  for (const p of commonPaths) {
-    if (!resources.has(p)) {
-      try {
-        const res = await fetch(resolveResourceUrl(p, baseUrl));
-        if (res.ok) addResource(resources, resourceUrls, p, baseUrl);
-      } catch (e) {}
-    }
-  }
+  // 验证这些路径是否存在（并行）
+  const missing = commonPaths.filter(p => !resources.has(p));
+  await Promise.all(missing.map(async (p) => {
+    try {
+      const res = await fetch(resolveResourceUrl(p, baseUrl));
+      if (res.ok) addResource(resources, resourceUrls, p, baseUrl);
+    } catch (e) {}
+  }));
 
   // 10. 过滤并返回
   const validResources = Array.from(resources).filter(isValidPath).sort();

@@ -703,16 +703,12 @@ async function handleAPI(request, pathname) {
       const email = normalizeEmail(body.email);
       const password = String(body.password || '');
       const confirmPassword = String(body.confirmPassword || '');
-      const verificationCode = String(body.verificationCode || '').trim();
-      if (!isValidEmail(email)) return jsonResponse({ error: '请输入有效邮箱' }, 400);
-      if (!verificationCode) return jsonResponse({ error: '请输入邮箱验证码' }, 400);
+      if (!email) return jsonResponse({ error: '请输入账号或邮箱' }, 400);
       if (password.length < 6) return jsonResponse({ error: '密码至少 6 位' }, 400);
       if (password !== confirmPassword) return jsonResponse({ error: '两次输入的密码不一致' }, 400);
       const users = await readUsers();
       const userIndex = users.findIndex(u => u.email === email);
-      if (userIndex < 0) return jsonResponse({ error: '该邮箱尚未注册' }, 404);
-      const codeOk = await verifyEmailCode(email, verificationCode);
-      if (!codeOk) return jsonResponse({ error: '邮箱验证码错误或已过期' }, 400);
+      if (userIndex < 0) return jsonResponse({ error: '该账号尚未注册' }, 404);
       const { salt, hash } = hashPassword(password);
       users[userIndex] = {
         ...users[userIndex],

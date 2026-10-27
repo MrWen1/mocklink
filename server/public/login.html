@@ -46,8 +46,7 @@
     border-radius: 0;
     box-shadow: 0 26px 74px rgba(44, 53, 62, 0.09);
   }
-  .card.registering,
-  .card.resetting {
+  .card.registering {
     min-height: 610px;
     padding-top: 46px;
   }
@@ -335,11 +334,11 @@ function setMode(nextMode) {
   document.title = `${isRegister ? '注册' : isReset ? '找回密码' : '登录'} - MockLink`;
   card.classList.toggle('registering', isRegister);
   card.classList.toggle('resetting', isReset);
-  document.getElementById('codeField').hidden = !(isRegister || isReset);
+  document.getElementById('codeField').hidden = !isRegister;
   document.getElementById('nameField').hidden = !isRegister;
   document.getElementById('confirmPasswordField').hidden = !(isRegister || isReset);
   document.getElementById('forgotRow').style.display = (isRegister || isReset) ? 'none' : 'block';
-  document.getElementById('email').placeholder = isRegister ? '请输入注册邮箱' : isReset ? '请输入绑定邮箱' : '请输入账号 / 邮箱';
+  document.getElementById('email').placeholder = isRegister ? '请输入注册邮箱' : isReset ? '请输入账号或邮箱' : '请输入账号 / 邮箱';
   document.getElementById('password').autocomplete = (isRegister || isReset) ? 'new-password' : 'current-password';
   document.getElementById('password').placeholder = isReset ? '请输入新密码' : '请输入密码';
   document.getElementById('confirmPassword').placeholder = isReset ? '请再次输入新密码' : '请再次输入密码';
@@ -482,11 +481,15 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
   err.classList.remove('show');
   err.classList.remove('info');
-  if ((mode === 'register' || mode === 'reset') && !isValidEmail(email)) {
-    showError(mode === 'reset' ? '请输入绑定邮箱' : '注册账号请输入有效邮箱');
+  if (mode === 'reset' && !email) {
+    showError('请输入账号或邮箱');
     return;
   }
-  if ((mode === 'register' || mode === 'reset') && !verificationCode) {
+  if (mode === 'register' && !isValidEmail(email)) {
+    showError('注册账号请输入有效邮箱');
+    return;
+  }
+  if (mode === 'register' && !verificationCode) {
     showError('请输入邮箱验证码');
     return;
   }
@@ -502,16 +505,12 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   btn.textContent = mode === 'register' ? '注册中...' : mode === 'reset' ? '重置中...' : '登录中...';
   try {
     const endpoint = mode === 'register' ? 'register' : mode === 'reset' ? 'reset-password' : 'login';
+    const payload = { email, password, confirmPassword, name };
+    if (mode === 'register') payload.verificationCode = verificationCode;
     const res = await fetch(`/api/auth/${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password,
-        confirmPassword,
-        verificationCode,
-        name,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || (mode === 'register' ? '注册失败' : mode === 'reset' ? '重置密码失败' : '登录失败'));
@@ -519,7 +518,6 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       showInfo(data.message || '密码已重置，请使用新密码登录');
       document.getElementById('password').value = '';
       document.getElementById('confirmPassword').value = '';
-      document.getElementById('verificationCode').value = '';
       setTimeout(() => setMode('login'), 900);
       return;
     }

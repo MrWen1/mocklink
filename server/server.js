@@ -633,16 +633,12 @@ async function handleAPI(req, res, urlParts) {
       const email = normalizeEmail(body.email);
       const password = String(body.password || '');
       const confirmPassword = String(body.confirmPassword || '');
-      const verificationCode = String(body.verificationCode || '').trim();
-      if (!isValidEmail(email)) { sendJSON(res, 400, { error: '请输入有效邮箱' }); return; }
-      if (!verificationCode) { sendJSON(res, 400, { error: '请输入邮箱验证码' }); return; }
+      if (!email) { sendJSON(res, 400, { error: '请输入账号或邮箱' }); return; }
       if (password.length < 6) { sendJSON(res, 400, { error: '密码至少 6 位' }); return; }
       if (password !== confirmPassword) { sendJSON(res, 400, { error: '两次输入的密码不一致' }); return; }
       const users = await readUsers();
       const userIndex = users.findIndex(u => u.email === email);
-      if (userIndex < 0) { sendJSON(res, 404, { error: '该邮箱尚未注册' }); return; }
-      const codeOk = await verifyEmailCode(email, verificationCode);
-      if (!codeOk) { sendJSON(res, 400, { error: '邮箱验证码错误或已过期' }); return; }
+      if (userIndex < 0) { sendJSON(res, 404, { error: '该账号尚未注册' }); return; }
       const { salt, hash } = hashPassword(password);
       users[userIndex] = {
         ...users[userIndex],
